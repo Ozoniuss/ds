@@ -115,7 +115,8 @@ func formatLinuxTree[T cmp.Ordered](t coloredTree[T]) string {
 		return fmt.Sprint(t.Root().Value())
 	}
 
-	out := fmt.Sprintf("%v\n", t.Root().Value())
+	var out strings.Builder
+	out.WriteString(fmt.Sprintf("%v\n", t.Root().Value()))
 	prefix := []string{}
 
 	type stkobj struct {
@@ -157,7 +158,7 @@ func formatLinuxTree[T cmp.Ordered](t coloredTree[T]) string {
 			} else {
 				toprint = getTtyColoredValue(l)
 			}
-			out += fmt.Sprintf("%s%s %v\n", strings.Join(prefix, ""), _PREFIX_LEFT, toprint)
+			out.WriteString(fmt.Sprintf("%s%s %v\n", strings.Join(prefix, ""), _PREFIX_LEFT, toprint))
 			prefix = append(prefix, _EXTRA_LEFT)
 			stack = append(stack, &stkobj{
 				n:   l,
@@ -173,7 +174,7 @@ func formatLinuxTree[T cmp.Ordered](t coloredTree[T]) string {
 			} else {
 				toprint = getTtyColoredValue(r)
 			}
-			out += fmt.Sprintf("%s%s %v\n", strings.Join(prefix, ""), _PREFIX_RIGHT, toprint)
+			out.WriteString(fmt.Sprintf("%s%s %v\n", strings.Join(prefix, ""), _PREFIX_RIGHT, toprint))
 			prefix = append(prefix, _EXTRA_RIGHT)
 			stack = append(stack, &stkobj{
 				n:   n.Right(),
@@ -184,7 +185,7 @@ func formatLinuxTree[T cmp.Ordered](t coloredTree[T]) string {
 		}
 	}
 
-	return strings.TrimSuffix(out, "\n")
+	return strings.TrimSuffix(out.String(), "\n")
 }
 
 // horizontalFomrmatter renders a horizontal ASCII representation of a binary tree.
@@ -247,7 +248,7 @@ func (p *horizontalFomrmatter[T]) buildTreeLines(root Node[T]) []treeLine {
 	maxRootSpacing := 0
 	// we don't really care about lines that are only on one side because there's
 	// no line on the other side to intersect with.
-	for i := 0; i < minCnt; i++ {
+	for i := range minCnt {
 		overlap := leftLines[i].rightOffset - rightLines[i].leftOffset
 		if overlap > maxRootSpacing {
 			maxRootSpacing = overlap
@@ -329,7 +330,7 @@ func (p *horizontalFomrmatter[T]) buildTreeLines(root Node[T]) []treeLine {
 
 	// adjust offsets for all lines that were already generated. also, merge
 	// the two lines on the same row together
-	for i := 0; i < maxCnt; i++ {
+	for i := range maxCnt {
 
 		// merge not required, just align to parent
 
