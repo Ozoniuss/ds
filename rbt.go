@@ -113,9 +113,11 @@ func NewRBT[T cmp.Ordered](opts ...RBTOpts[T]) *RBT[T] {
 func (t *RBT[T]) Root() Node[T] {
 	panicIfNilRBT(t)
 
-	if t.root.isSentinel() {
+	// tnil must not be exposed externally
+	if t.root == t.tnil {
 		return nil
 	}
+
 	return t.root
 }
 
