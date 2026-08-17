@@ -100,6 +100,12 @@ func NewRBT[T cmp.Ordered](opts ...RBTOpts[T]) *RBT[T] {
 	for _, o := range opts {
 		o(t)
 	}
+
+	// assert that options do not change root and tnil
+	if t.tnil != tnil || t.root != tnil {
+		panic("options must not modify root and tnil during initialization")
+	}
+
 	return t
 }
 
