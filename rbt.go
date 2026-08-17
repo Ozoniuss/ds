@@ -105,7 +105,7 @@ func NewRBT[T cmp.Ordered](opts ...RBTOpts[T]) *RBT[T] {
 
 // Root() returns the root of the tree.
 func (t *RBT[T]) Root() Node[T] {
-	panicIfNilTree(t)
+	panicIfNilRBT(t)
 
 	if t.root.isSentinel() {
 		return nil
@@ -115,7 +115,7 @@ func (t *RBT[T]) Root() Node[T] {
 
 // Size returns the number of nodes in the tree.
 func (t *RBT[T]) Size() int {
-	panicIfNilTree(t)
+	panicIfNilRBT(t)
 
 	return t.size
 }
@@ -124,11 +124,12 @@ func (t *RBT[T]) Size() int {
 // is not configured to accept multiple values, this operation will always return
 // either 0 or 1.
 func (t *RBT[T]) Count(value T) int {
-	panicIfNilTree(t)
+	panicIfNilRBT(t)
 
-	if t.root == nil {
+	if t.root == t.tnil {
 		return 0
 	}
+
 	c := t.root
 	for c != t.tnil {
 		if value < c.value {
@@ -145,7 +146,7 @@ func (t *RBT[T]) Count(value T) int {
 // Insert adds a value to the tree. If the tree is not configured to accept multiple
 // values, it will return an error when the same value is inserted twice.
 func (t *RBT[T]) Insert(value T) error {
-	panicIfNilTree(t)
+	panicIfNilRBT(t)
 
 	if t.root == t.tnil {
 		t.root = &RBTNode[T]{
@@ -201,10 +202,9 @@ func (t *RBT[T]) Insert(value T) error {
 }
 
 func (t *RBT[T]) Delete(value T) error {
-	panicIfNilTree(t)
+	panicIfNilRBT(t)
 
-	// uninitialized tree
-	if t.root == nil {
+	if t.root == t.tnil {
 		return errors.New("value not found")
 	}
 
@@ -262,7 +262,7 @@ func (t *RBT[T]) Delete(value T) error {
 }
 
 func (t *RBT[T]) String() string {
-	panicIfNilTree(t)
+	panicIfNilRBT(t)
 
 	return FormatTree(t, string(FormatHorizontal))
 }
@@ -279,19 +279,19 @@ type RBTNode[T cmp.Ordered] struct {
 }
 
 func (n *RBTNode[T]) Value() T {
-	panicIfNodeOrSentinel(n)
+	panicIfNilRBTNodeOrSentinel(n)
 
 	return n.value
 }
 
 func (n *RBTNode[T]) Count() int {
-	panicIfNodeOrSentinel(n)
+	panicIfNilRBTNodeOrSentinel(n)
 
 	return n.count
 }
 
 func (n *RBTNode[T]) Parent() Node[T] {
-	panicIfNodeOrSentinel(n)
+	panicIfNilRBTNodeOrSentinel(n)
 
 	if n.parent.isSentinel() {
 		return nil
@@ -300,7 +300,7 @@ func (n *RBTNode[T]) Parent() Node[T] {
 }
 
 func (n *RBTNode[T]) Left() Node[T] {
-	panicIfNodeOrSentinel(n)
+	panicIfNilRBTNodeOrSentinel(n)
 
 	if n.left.isSentinel() {
 		return nil
@@ -309,7 +309,7 @@ func (n *RBTNode[T]) Left() Node[T] {
 }
 
 func (n *RBTNode[T]) Right() Node[T] {
-	panicIfNodeOrSentinel(n)
+	panicIfNilRBTNodeOrSentinel(n)
 
 	if n.right.isSentinel() {
 		return nil
@@ -335,17 +335,24 @@ func sentinel[T cmp.Ordered]() *RBTNode[T] {
 	}
 }
 
-// panicIfNodeOrSentinel will panic if the current node is nil or a sentinel.
+// panicIfNilRBT will panic if the tree is nil (hence, the tree is uninitialized).
+func panicIfNilRBT[T cmp.Ordered](n *RBT[T]) {
+	if n == nil {
+		panic("nil rbt")
+	}
+}
+
+// panicIfNilRBTNodeOrSentinel will panic if the current node is nil or a sentinel.
 // Sentinels are included because they are an implementation detail to simplify
 // edge case handling in algorithms, but in essence they still represent nil
 // nodes and should be exposed as nil from public methods.
 //
 // Note that this method is typically called for public methods, as algorithms
 // use the internal representation directly.
-func panicIfNodeOrSentinel[T cmp.Ordered](n *RBTNode[T]) {
+func panicIfNilRBTNodeOrSentinel[T cmp.Ordered](n *RBTNode[T]) {
 	if n == nil {
 		panic("nil node")
-	} else if n.isSentinel() {
+	} else if n.sentinel {
 		panic("nil node")
 	}
 }
