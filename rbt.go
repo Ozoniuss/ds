@@ -344,9 +344,9 @@ func sentinel[T cmp.Ordered]() *RBTNode[T] {
 }
 
 // panicIfNilRBT will panic if the tree is nil (hence, the tree is uninitialized).
-func panicIfNilRBT[T cmp.Ordered](n *RBT[T]) {
-	if n == nil {
-		panic("nil rbt")
+func panicIfNilRBT[T cmp.Ordered](t *RBT[T]) {
+	if t == nil || t.tnil == nil {
+		panic("nil rbt, use NewRBT")
 	}
 }
 
