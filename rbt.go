@@ -70,6 +70,8 @@ type RBT[T cmp.Ordered] struct {
 	// is an object with the same attributes as an ordinary node in the tree. Its
 	// color attribute is BLACK, and its other attributes have no meaning so are
 	// set to the default value of their type. We refer to this sentinel as "tnil".
+	// (however during methods, the values of the sentinel MAY chang, in which
+	// case another sentinel should be used).
 	//
 	// If the left or right child of a node is empty, we set it to tnil instead
 	// of nil. Similarly, we set the parent of the root node to tnil.
@@ -365,12 +367,30 @@ func panicIfNilRBTNodeOrSentinel[T cmp.Ordered](n *RBTNode[T]) {
 	}
 }
 
+// leftRotate brings the right child of x to its position. This operation preserves
+// the binary search tree property.
+//
+// It is assumed y is not tnil.
+//
+//	    y                                         x
+//	   / \        <---left  rotate(T,x)---       / \
+//	  x   c                                     a   y
+//	 / \           ---right rotate(T,y)--->        / \
+//	a   b                                         b   c
 func leftRotate[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
 	y := x.right
+	if y == t.tnil {
+		panic("leftRotate: y must not be tnil")
+	}
+
+	// set the right node for x and its parents to x, which completes the
+	// leaves on left side
 	x.right = y.left
 	if y.left != t.tnil {
 		y.left.parent = x
 	}
+
+	// y becomes x
 	y.parent = x.parent
 	if x.parent == t.tnil {
 		t.root = y
@@ -379,16 +399,36 @@ func leftRotate[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
 	} else {
 		x.parent.right = y
 	}
+
+	// x becomes left child of y
 	y.left = x
 	x.parent = y
 }
 
+// rightRotate brings the left child of y to its position. This operation preserves
+// the binary search tree property.
+//
+// It is assumed x is not tnil.
+//
+//	    y                                         x
+//	   / \        <---left  rotate(T,x)---       / \
+//	  x   c                                     a   y
+//	 / \           ---right rotate(T,y)--->        / \
+//	a   b                                         b   c
 func rightRotate[T cmp.Ordered](t *RBT[T], y *RBTNode[T]) {
 	x := y.left
+	if x == t.tnil {
+		panic("rightRotate: x must not be tnil")
+	}
+
+	// set the left node for y and its parents to y, which completes the
+	// leaves on right side
 	y.left = x.right
 	if x.right != t.tnil {
 		x.right.parent = y
 	}
+
+	// x becomes y
 	x.parent = y.parent
 	if y.parent == t.tnil {
 		t.root = x
@@ -397,6 +437,8 @@ func rightRotate[T cmp.Ordered](t *RBT[T], y *RBTNode[T]) {
 	} else {
 		y.parent.right = x
 	}
+
+	// y becomes right child of x
 	x.right = y
 	y.parent = x
 }
