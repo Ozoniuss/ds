@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/Ozoniuss/tree"
+	tree "github.com/Ozoniuss/ds/tree"
 )
 
 func main() {

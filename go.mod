@@ -1,3 +1,3 @@
-module github.com/Ozoniuss/tree
+module github.com/Ozoniuss/ds
 
 go 1.26.6
