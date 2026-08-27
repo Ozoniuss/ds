@@ -16,7 +16,7 @@ func mustPanic(t *testing.T, fn func()) {
 	fn()
 }
 
-func TestRBTUninitialized(t *testing.T) {
+func TestRBTNilReceiver(t *testing.T) {
 	t.Parallel()
 
 	type method struct {
@@ -33,23 +33,100 @@ func TestRBTUninitialized(t *testing.T) {
 		{name: "String", fn: func(tr *RBT[int]) { _ = tr.String() }},
 	}
 
-	trees := []struct {
-		name string
-		tree *RBT[int]
-	}{
-		{name: "nilReceiver", tree: nil},
-		{name: "zeroValue", tree: &RBT[int]{}},
-		{name: "missingSentinel", tree: &RBT[int]{size: 0, root: nil, tnil: nil}},
+	for _, m := range methods {
+		t.Run(m.name, func(t *testing.T) {
+			t.Parallel()
+			mustPanic(t, func() { m.fn(nil) })
+		})
 	}
+}
 
-	for _, tr := range trees {
-		for _, m := range methods {
-			t.Run(tr.name+"/"+m.name, func(t *testing.T) {
-				t.Parallel()
-				mustPanic(t, func() { m.fn(tr.tree) })
-			})
+// TestRBTZeroValue checks that a tree created through the type directly is a
+// valid empty tree.
+func TestRBTZeroValue(t *testing.T) {
+	t.Parallel()
+
+	t.Run("reads", func(t *testing.T) {
+		t.Parallel()
+
+		var tr RBT[int]
+
+		if tr.Size() != 0 {
+			t.Errorf("size: got %d, want 0", tr.Size())
 		}
-	}
+		if tr.Root() != nil {
+			t.Errorf("root: got %#v, want nil", tr.Root())
+		}
+		if got := tr.Count(1); got != 0 {
+			t.Errorf("Count(1): got %d, want 0", got)
+		}
+		if got := tr.String(); got != "empty tree" {
+			t.Errorf("String: got %q, want %q", got, "empty tree")
+		}
+
+		// reads must not allocate the sentinel
+		if tr.tnil != nil {
+			t.Error("tnil was allocated by a read")
+		}
+		if tr.root != nil {
+			t.Error("root was set by a read")
+		}
+	})
+
+	t.Run("delete", func(t *testing.T) {
+		t.Parallel()
+
+		var tr RBT[int]
+
+		err := tr.Delete(1)
+		if err == nil {
+			t.Fatal("Delete on zero value tree: got nil error")
+		}
+		if err.Error() != "value not found" {
+			t.Errorf("Delete on zero value tree: got %q, want %q", err.Error(), "value not found")
+		}
+		if tr.Size() != 0 {
+			t.Errorf("size after failed delete: got %d, want 0", tr.Size())
+		}
+	})
+
+	t.Run("insert", func(t *testing.T) {
+		t.Parallel()
+
+		var tr RBT[int]
+
+		for _, v := range []int{5, 3, 8, 1, 4, 7, 9, 2, 6} {
+			if err := tr.Insert(v); err != nil {
+				t.Fatalf("Insert(%d): %v", v, err)
+			}
+		}
+
+		if tr.Size() != 9 {
+			t.Errorf("size: got %d, want 9", tr.Size())
+		}
+		if tr.Root() == nil {
+			t.Fatal("root is nil after inserts")
+		}
+		for _, v := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9} {
+			if got := tr.Count(v); got != 1 {
+				t.Errorf("Count(%d): got %d, want 1", v, got)
+			}
+		}
+
+		if err := tr.Insert(5); err == nil {
+			t.Error("duplicate Insert on zero value tree: got nil error")
+		}
+
+		if err := tr.Delete(5); err != nil {
+			t.Fatalf("Delete(5): %v", err)
+		}
+		if tr.Size() != 8 {
+			t.Errorf("size after delete: got %d, want 8", tr.Size())
+		}
+		if got := tr.Count(5); got != 0 {
+			t.Errorf("Count(5) after delete: got %d, want 0", got)
+		}
+	})
 }
 
 func TestRBTEmpty(t *testing.T) {

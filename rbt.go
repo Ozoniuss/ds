@@ -33,6 +33,9 @@ const (
 // Typically, a tree will only contain unique values. By default, RBT enforces
 // that constraint but can be configured to accept multiple values.
 //
+// The zero value is an empty tree that is ready to use. Note that options can
+// only be passed through NewRBT, so such a tree never accepts duplicates.
+//
 // There is a distinction between a tree object and a node object in order to
 // have a clearer interface. All write operations and methods that return information
 // about the entire tree are only defined on the tree object. The node object is
@@ -59,8 +62,9 @@ const (
 // two abstractions makes the intent clear and doesn't require distinguishing
 // between the "root" node and other nodes.
 type RBT[T cmp.Ordered] struct {
-	// Represents the root node of a tree. An uninitialized tree will set this to
-	// nil, whereas an initialized tree will set this to tnil.
+	// Represents the root node of a tree. A tree created through the type
+	// directly will set this to nil until the first write, whereas an
+	// initialized tree will set this to tnil.
 	root *RBTNode[T]
 	// Represents the number of nodes in the tree, excluding sentinel nodes (see
 	// below).
@@ -93,12 +97,10 @@ func WithAllowedDuplicates[T cmp.Ordered]() RBTOpts[T] {
 
 // NewRBT returns an initialized red black tree.
 func NewRBT[T cmp.Ordered](opts ...RBTOpts[T]) *RBT[T] {
-	tnil := sentinel[T]()
-	t := &RBT[T]{
-		size: 0,
-		root: tnil,
-		tnil: tnil,
-	}
+	t := &RBT[T]{}
+	t.lazyInit()
+	tnil := t.tnil
+
 	for _, o := range opts {
 		o(t)
 	}
@@ -157,6 +159,7 @@ func (t *RBT[T]) Count(value T) int {
 // values, it will return an error when the same value is inserted twice.
 func (t *RBT[T]) Insert(value T) error {
 	panicIfNilRBT(t)
+	t.lazyInit()
 
 	if t.root == t.tnil {
 		t.root = &RBTNode[T]{
@@ -213,6 +216,7 @@ func (t *RBT[T]) Insert(value T) error {
 
 func (t *RBT[T]) Delete(value T) error {
 	panicIfNilRBT(t)
+	t.lazyInit()
 
 	if t.root == t.tnil {
 		return errors.New("value not found")
@@ -345,10 +349,18 @@ func sentinel[T cmp.Ordered]() *RBTNode[T] {
 	}
 }
 
-// panicIfNilRBT will panic if the tree is nil (hence, the tree is uninitialized).
 func panicIfNilRBT[T cmp.Ordered](t *RBT[T]) {
-	if t == nil || t.tnil == nil {
-		panic("nil rbt, use NewRBT")
+	if t == nil {
+		panic("nil rbt")
+	}
+}
+
+// lazyInit is used to allow creating a RBT through the type directly (i.e. as
+// t := &RBT{}).
+func (t *RBT[T]) lazyInit() {
+	if t.tnil == nil {
+		t.tnil = sentinel[T]()
+		t.root = t.tnil
 	}
 }
 
