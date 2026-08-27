@@ -7,6 +7,9 @@ import "cmp"
 // interface.
 //
 // Calling any method on a nil tree should panic.
+//
+// To match semantics of list and map Go containers, a tree that is initialized
+// directly via the type itself should be a valid tree with size 0.
 type Tree[T cmp.Ordered] interface {
 	// Retrieve the Root of this tree. Returns nil for a tree that had no nodes
 	// inserted to it.
@@ -37,7 +40,7 @@ type Tree[T cmp.Ordered] interface {
 //
 // Nodes are not meant to be modified directly as all operations are expected
 // to be performed using the Tree object. This is to prevent producing a tree
-// that does not satisfy the binary search tree property. The primary reason
+// that does not satisfy the binary search tree properties. The primary reason
 // it exists in the first place is to allow defining custom traversal algorithms
 // on the tree.
 //
