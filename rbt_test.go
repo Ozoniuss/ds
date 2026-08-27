@@ -288,3 +288,172 @@ func TestRBTNilAndSentinelNodes(t *testing.T) {
 		}
 	}
 }
+
+// TestLeftRotateMissingRightChildPanics checks that leftRotate rejects a node
+// without a right child, whether or not it is the root.
+func TestLeftRotateMissingRightChildPanics(t *testing.T) {
+	t.Parallel()
+
+	t.Run("rootWithoutRightChild", func(t *testing.T) {
+		t.Parallel()
+
+		tr := NewRBT[int]()
+		x := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
+		a := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 1, count: 1}
+		x.left = a
+		tr.root = x
+		tr.size = 2
+
+		mustPanic(t, func() { leftRotate(tr, x) })
+	})
+
+	t.Run("nonRootWithoutRightChild", func(t *testing.T) {
+		t.Parallel()
+
+		tr := NewRBT[int]()
+		p := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 4, count: 1}
+		x := &RBTNode[int]{parent: p, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
+		a := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 1, count: 1}
+		p.left = x
+		x.left = a
+		tr.root = p
+		tr.size = 3
+
+		mustPanic(t, func() { leftRotate(tr, x) })
+	})
+
+	t.Run("sentinel", func(t *testing.T) {
+		t.Parallel()
+
+		tr := NewRBT[int]()
+
+		mustPanic(t, func() { leftRotate(tr, tr.tnil) })
+	})
+}
+
+// TestRightRotateMissingLeftChildPanics checks that rightRotate rejects a node
+// without a left child, whether or not it is the root.
+func TestRightRotateMissingLeftChildPanics(t *testing.T) {
+	t.Parallel()
+
+	t.Run("rootWithoutLeftChild", func(t *testing.T) {
+		t.Parallel()
+
+		tr := NewRBT[int]()
+		y := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
+		c := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 3, count: 1}
+		y.right = c
+		tr.root = y
+		tr.size = 2
+
+		mustPanic(t, func() { rightRotate(tr, y) })
+	})
+
+	t.Run("nonRootWithoutLeftChild", func(t *testing.T) {
+		t.Parallel()
+
+		tr := NewRBT[int]()
+		p := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 1, count: 1}
+		y := &RBTNode[int]{parent: p, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
+		c := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 3, count: 1}
+		p.right = y
+		y.right = c
+		tr.root = p
+		tr.size = 3
+
+		mustPanic(t, func() { rightRotate(tr, y) })
+	})
+
+	t.Run("sentinel", func(t *testing.T) {
+		t.Parallel()
+
+		tr := NewRBT[int]()
+
+		mustPanic(t, func() { rightRotate(tr, tr.tnil) })
+	})
+}
+
+// TestRotateSingleChild rotates a two node tree in both directions:
+//
+//	x          y              y          x
+//	 \   -->  /              /    -->     \
+//	  y      x              x              y
+func TestRotateSingleChild(t *testing.T) {
+	t.Parallel()
+
+	t.Run("leftRotate", func(t *testing.T) {
+		t.Parallel()
+
+		tr := NewRBT[int]()
+		x := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 1, count: 1}
+		y := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
+		x.right = y
+		tr.root = x
+		tr.size = 2
+
+		leftRotate(tr, x)
+
+		if tr.root != y {
+			t.Errorf("root: got %d, want %d", tr.root.value, y.value)
+		}
+		if y.parent != tr.tnil {
+			t.Errorf("y.parent: got %d, want tnil", y.parent.value)
+		}
+		if y.left != x {
+			t.Errorf("y.left: got %d, want %d", y.left.value, x.value)
+		}
+		if y.right != tr.tnil {
+			t.Errorf("y.right: got %d, want tnil", y.right.value)
+		}
+		if x.parent != y {
+			t.Errorf("x.parent: got %d, want %d", x.parent.value, y.value)
+		}
+		if x.left != tr.tnil {
+			t.Errorf("x.left: got %d, want tnil", x.left.value)
+		}
+		if x.right != tr.tnil {
+			t.Errorf("x.right: got %d, want tnil", x.right.value)
+		}
+		if tr.tnil.parent != nil {
+			t.Error("tnil.parent was written to")
+		}
+	})
+
+	t.Run("rightRotate", func(t *testing.T) {
+		t.Parallel()
+
+		tr := NewRBT[int]()
+		y := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
+		x := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 1, count: 1}
+		y.left = x
+		tr.root = y
+		tr.size = 2
+
+		rightRotate(tr, y)
+
+		if tr.root != x {
+			t.Errorf("root: got %d, want %d", tr.root.value, x.value)
+		}
+		if x.parent != tr.tnil {
+			t.Errorf("x.parent: got %d, want tnil", x.parent.value)
+		}
+		if x.right != y {
+			t.Errorf("x.right: got %d, want %d", x.right.value, y.value)
+		}
+		if x.left != tr.tnil {
+			t.Errorf("x.left: got %d, want tnil", x.left.value)
+		}
+		if y.parent != x {
+			t.Errorf("y.parent: got %d, want %d", y.parent.value, x.value)
+		}
+		if y.left != tr.tnil {
+			t.Errorf("y.left: got %d, want tnil", y.left.value)
+		}
+		if y.right != tr.tnil {
+			t.Errorf("y.right: got %d, want tnil", y.right.value)
+		}
+		if tr.tnil.parent != nil {
+			t.Error("tnil.parent was written to")
+		}
+	})
+}
