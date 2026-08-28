@@ -5,6 +5,11 @@ import (
 	"errors"
 )
 
+func _[T cmp.Ordered]() {
+	var _ Tree[T] = (*RBT[T])(nil)
+	var _ Node[T] = (*RBTNode[T])(nil)
+}
+
 /*
 	Implementation based on "Introduction to Algorithms by Thomas H. Cormen,
 	Charles E. Leiserson, Ronald L. Rivest, and Clifford Stein."
