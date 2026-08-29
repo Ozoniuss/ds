@@ -565,11 +565,11 @@ func TestRotateSingleChild(t *testing.T) {
 	})
 }
 
-// FuzzRBTInsert inserts an arbitrary sequence of values and checks that the
+// FuzzRBTEachInsert inserts an arbitrary sequence of values and checks that the
 // tree is still a binary search tree after each one.
 //
 // TODO: check AI analysis for choice of fuzz inputs and input truncation.
-func FuzzRBTInsert(f *testing.F) {
+func FuzzRBTEachInsert(f *testing.F) {
 
 	// can only use []byte when fuzzing.
 	f.Add([]byte{})
