@@ -74,33 +74,74 @@ func assertBSTProperty[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 // not include the node x, but it does include TNILs. The black height of an
 // internal leaf is therefore 1.
 // - lg means logarithm with base 2.
-// func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
-// 	t.Helper()
+func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
+	t.Helper()
 
-// 	if tree == nil {
-// 		panic("assert called on nil tree")
-// 	}
+	if tree == nil {
+		panic("assert called on nil tree")
+	}
 
-// 	// nothing to assert here
-// 	if tree.Size() == 0 {
-// 		return
-// 	}
+	// nothing to assert here
+	if tree.Size() == 0 {
+		return
+	}
 
-// 	if tree.Root() == nil {
-// 		panic("nil root")
-// 	}
+	if tree.Root() == nil {
+		panic("nil root")
+	}
 
-// 	var walk func(n Node[T]) (internalNodes int)
-// 	bh := -1 // unset
-// 	walk = func(n Node[T]) {
-// 		if n == nil {
-// 			bh = 0
+	if tree.Root().color != _COLOR_BLACK {
+		t.Error("root should be black")
+	}
 
-// 		}
-// 	}
+	// blen represents the accumulated black path length up to the node.
+	// internalNodeCount represents the internal node count fo the subtree, and
+	// parentbh represents the black height the parent node would have (remember
+	// that black height does not include the node)
+	var walk func(n *RBTNode[T], blen int) (internalNodeCount int, parentbh int)
+	rootbh := -1 // unset
+	walk = func(n *RBTNode[T], blen int) (int, int) {
+		if n.isSentinel() {
+			if rootbh == -1 {
+				rootbh = blen
+			}
+			if rootbh != blen {
+				t.Fatal("found two paths with different black length")
+			}
+			return 0, 1
+		}
 
-// 	walk(tree.Root())
-// }
+		// may include TNIL leaves, which is fine
+		if n.color == _COLOR_RED &&
+			(n.left.color != _COLOR_BLACK || n.right.color != _COLOR_BLACK) {
+			t.Fatal("found red node whose children aren't both black")
+		}
+
+		if n.color == _COLOR_BLACK {
+			// increase black length going downwards
+			blen += 1
+		}
+
+		// actually walk up to the sentinel here
+		incl, bhl := walk(n.left, blen)
+		incr, bhr := walk(n.right, blen)
+		bh := max(bhl, bhr)
+
+		nc := incl + incr + 1
+		if nc < 1<<bh-1 {
+			t.Fatal("found a subtree with less than 2^bh(x)-1 nodes")
+		}
+
+		// increase black height going upwards.
+		if n.color == _COLOR_BLACK {
+			bh += 1
+		}
+
+		return incl + incr + 1, bh
+	}
+
+	walk(tree.Root(), 0)
+}
 
 func TestRBTNilReceiver(t *testing.T) {
 	t.Parallel()
