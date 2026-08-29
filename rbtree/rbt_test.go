@@ -46,14 +46,15 @@ func assertBSTProperty[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 	walk(tree.Root(), nil, nil)
 }
 
-// assertRBTProperties checks the following:
-// - the root is black (nil leaves aren't checked here)
-// - if a node is red, both its children are black
-// - for each node, all paths to the leaves (including TNIL) have the same
-// number of black nodes
+// assertRBTProperties checks the following by visiting each node once:
+// - The root is black.
+// - TNIL leaves are black.
+// - If a node is red, both its children are black.
+// - For each node, all paths to the (TNIL) leaves have the same number of
+// black nodes.
 //
 // Additionally, we assert that any subtree rooted at node x contains at least
-// 2 ^ bh(x) - 1 internal nodes (this can be proven easily via induction). This
+// 2 ^ bh(x) - 1 internal nodes (this can be proven easily via induction). It
 // can be used to show that the height of a tree is at most 2lg(n+1) (thus
 // proving the logarithmic comlexity of the operations):
 //
@@ -91,21 +92,26 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 	}
 
 	if tree.Root().color != _COLOR_BLACK {
-		t.Error("root should be black")
+		t.Fatal("root should be black")
 	}
 
-	// blen represents the accumulated black path length up to the node.
+	// blen represents the accumulated black path length up to the node. This
+	// needs to be calculated when going downwards, since the parents must be
+	// explored.
+	//
 	// internalNodeCount represents the internal node count fo the subtree, and
-	// parentbh represents the black height the parent node would have (remember
-	// that black height does not include the node)
+	// parentbh represents the black height a parent of n would have (this is
+	// the same regardless of a parent's color since the parent is not included).
+	// This needs to be calculated going upwards, since the node's children have
+	// to be explored.
 	var walk func(n *RBTNode[T], blen int) (internalNodeCount int, parentbh int)
-	rootbh := -1 // unset
+	rootblen := -1 // unset
 	walk = func(n *RBTNode[T], blen int) (int, int) {
 		if n.isSentinel() {
-			if rootbh == -1 {
-				rootbh = blen
+			if rootblen == -1 {
+				rootblen = blen
 			}
-			if rootbh != blen {
+			if rootblen != blen {
 				t.Fatal("found two paths with different black length")
 			}
 			return 0, 1
@@ -140,7 +146,16 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 		return incl + incr + 1, bh
 	}
 
-	walk(tree.Root(), 0)
+	nc, bh := walk(tree.Root(), 0)
+
+	// note that rootblen does not increment for sentinels, and bh represents
+	// the black height of a fictional parent of the root (and the root is black)
+	if bh-1 != rootblen {
+		t.Fatal("calculated black height must match path length")
+	}
+	if nc < 1 <<(bh-1)  - 1 {
+		t.Fatal("root has less than 2^bh(root)-1 nodes")
+	}
 }
 
 func TestRBTNilReceiver(t *testing.T) {
