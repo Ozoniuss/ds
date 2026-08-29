@@ -1,3 +1,5 @@
+> Note: this package will be deprecated.
+
 # Tree
 
 Provides a standardized way of working with binary search trees in Go, as well as several binary search tree implementations. Oriented towards competitive programming or the implementation of other data structures such as ordered sets and ordered multisets.
