@@ -2,6 +2,8 @@ package rbtree
 
 import (
 	"cmp"
+	"fmt"
+	"math/rand/v2"
 	"testing"
 )
 
@@ -185,6 +187,25 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 	}
 	if nc < 1<<(bh-1)-1 {
 		t.Fatal("root has less than 2^bh(root)-1 nodes")
+	}
+}
+
+func TestRBTPropertiesDeterministicPermutations(t *testing.T) {
+	rng := rand.New(rand.NewPCG(6, 9))
+
+	for i := range 100 {
+		n := rng.IntN(1_000) + 1
+		values := rng.Perm(1_000)[:n]
+
+		t.Run(fmt.Sprintf("%03d/n=%d", i, n), func(t *testing.T) {
+			tr := NewRBT[int]()
+			for _, v := range values {
+				if err := tr.Insert(v); err != nil {
+					t.Fatalf("insert %d: %v", v, err)
+				}
+				assertRBTProperties(t, tr)
+			}
+		})
 	}
 }
 
