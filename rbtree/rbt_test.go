@@ -47,6 +47,7 @@ func assertBSTProperty[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 }
 
 // assertRBTProperties checks the following by visiting each node once:
+// - All nodes are either red or black.
 // - The root is black.
 // - TNIL leaves are black.
 // - If a node is red, both its children are black.
@@ -117,7 +118,15 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 	rootblen := -1 // unset
 	walk = func(n *RBTNode[T], blen int, lo, hi *T) (int, int) {
 
+		if n.color != _COLOR_RED && n.color != _COLOR_BLACK {
+			t.Fatal("found a node with an invalid color")
+		}
+
 		if n.isSentinel() {
+			// this may be unnecessary
+			if n.color != _COLOR_BLACK {
+				t.Fatal("sentinel node should be black")
+			}
 			if rootblen == -1 {
 				rootblen = blen
 			}
