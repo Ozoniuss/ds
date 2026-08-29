@@ -19,6 +19,13 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Check go fix
+        run: |
+          if ! go fix -diff ./...; then
+            echo "::error::go fix found changes. Run 'go fix ./...' locally and commit the result."
+            exit 1
+          fi
+
       - name: Build
         run: go build ./...
 
