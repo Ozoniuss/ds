@@ -19,35 +19,6 @@ func mustPanic(t *testing.T, fn func()) {
 	fn()
 }
 
-// assertBSTProperty verifies that for every node, all values in its left
-// subtree are smaller and all values in its right subtree are larger.
-//
-// TODO: maybe this can be optimized (e.g. Morris traversal) but keeping it like
-// this for readability.
-func assertBSTProperty[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
-	t.Helper()
-
-	// use pointers because when checking the root of a subtree there may be
-	// no bounds or a single bound (e.g. when going on the leftmost or rightmost
-	// branch)
-	var walk func(n *RBTNode[T], lo, hi *T)
-	walk = func(n *RBTNode[T], lo, hi *T) {
-		if n == nil {
-			return
-		}
-		v := n.Value()
-		if lo != nil && v <= *lo {
-			t.Errorf("bst property violated: %v is in the right subtree of %v", v, *lo)
-		}
-		if hi != nil && v >= *hi {
-			t.Errorf("bst property violated: %v is in the left subtree of %v", v, *hi)
-		}
-		walk(n.Left(), lo, &v)
-		walk(n.Right(), &v, hi)
-	}
-	walk(tree.Root(), nil, nil)
-}
-
 // assertRBTProperties checks the following by visiting each node once:
 // - All nodes are either red or black.
 // - The root is black.
@@ -720,8 +691,8 @@ func TestRotateSingleChild(t *testing.T) {
 	})
 }
 
-// FuzzRBTEachInsert inserts an arbitrary sequence of values and checks that the
-// tree is still a binary search tree after each one.
+// FuzzRBTEachInsert inserts an arbitrary sequence of values and checks the
+// red-black tree properties after each one.
 //
 // TODO: check AI analysis for choice of fuzz inputs and input truncation.
 func FuzzRBTEachInsert(f *testing.F) {
@@ -763,9 +734,9 @@ func FuzzRBTEachInsert(f *testing.F) {
 			// here and must leave the tree untouched
 			_ = tr.Insert(int(v))
 
-			assertBSTProperty(t, tr)
+			assertRBTProperties(t, tr)
 			if t.Failed() {
-				t.Fatalf("bst property broken after inserting %v", values[:i+1])
+				t.Fatalf("red-black tree property broken after inserting %v", values[:i+1])
 			}
 		}
 	})

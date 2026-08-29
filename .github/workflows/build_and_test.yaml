@@ -35,3 +35,6 @@ jobs:
 
       - name: Run tests
         run: go test ./...
+
+      - name: Run fuzz test
+        run: go test ./rbtree -run '^$' -fuzz '^Fuzz' -fuzztime 10s
