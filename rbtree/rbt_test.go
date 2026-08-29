@@ -52,6 +52,9 @@ func assertBSTProperty[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 // - If a node is red, both its children are black.
 // - For each node, all paths to the (TNIL) leaves have the same number of
 // black nodes.
+// - On top of these RBT properties, it also checks the binary search tree
+// property that for a node, all values of the left children are smaller and
+// all values of the right children are larger.
 //
 // Additionally, we assert that any subtree rooted at node x contains at least
 // 2 ^ bh(x) - 1 internal nodes (this can be proven easily via induction). It
@@ -104,9 +107,16 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 	// the same regardless of a parent's color since the parent is not included).
 	// This needs to be calculated going upwards, since the node's children have
 	// to be explored.
-	var walk func(n *RBTNode[T], blen int) (internalNodeCount int, parentbh int)
+
+	// lo and hi represent the boundaries to compare the current value against
+	// to validate the binary search tree property. Use pointers here because
+	// sometimes there are no bounds (e.g. the root can have any value, when
+	// going down on the leftmost or rightmost brach we can encounter arbitrarily
+	// small or large values, respectively)
+	var walk func(n *RBTNode[T], blen int, lo, hi *T) (internalNodeCount int, parentbh int)
 	rootblen := -1 // unset
-	walk = func(n *RBTNode[T], blen int) (int, int) {
+	walk = func(n *RBTNode[T], blen int, lo, hi *T) (int, int) {
+
 		if n.isSentinel() {
 			if rootblen == -1 {
 				rootblen = blen
@@ -116,6 +126,17 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 			}
 			return 0, 1
 		}
+
+		// check BST properties
+		v := n.Value()
+		if lo != nil && v <= *lo {
+			t.Errorf("bst property violated: %v is in the right subtree of %v", v, *lo)
+		}
+		if hi != nil && v >= *hi {
+			t.Errorf("bst property violated: %v is in the left subtree of %v", v, *hi)
+		}
+
+		// now check RBT properties
 
 		// may include TNIL leaves, which is fine
 		if n.color == _COLOR_RED &&
@@ -129,8 +150,8 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 		}
 
 		// actually walk up to the sentinel here
-		incl, bhl := walk(n.left, blen)
-		incr, bhr := walk(n.right, blen)
+		incl, bhl := walk(n.left, blen, lo, &v)
+		incr, bhr := walk(n.right, blen, &v, hi)
 		bh := max(bhl, bhr)
 
 		nc := incl + incr + 1
@@ -146,14 +167,14 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 		return incl + incr + 1, bh
 	}
 
-	nc, bh := walk(tree.Root(), 0)
+	nc, bh := walk(tree.Root(), 0, nil, nil)
 
 	// note that rootblen does not increment for sentinels, and bh represents
 	// the black height of a fictional parent of the root (and the root is black)
 	if bh-1 != rootblen {
 		t.Fatal("calculated black height must match path length")
 	}
-	if nc < 1 <<(bh-1)  - 1 {
+	if nc < 1<<(bh-1)-1 {
 		t.Fatal("root has less than 2^bh(root)-1 nodes")
 	}
 }
