@@ -170,11 +170,26 @@ func TestRBTPropertiesDeterministicPermutations(t *testing.T) {
 
 		t.Run(fmt.Sprintf("%03d/n=%d", i, n), func(t *testing.T) {
 			tr := NewRBT[int]()
+			cnt := 0
 			for _, v := range values {
 				if err := tr.Insert(v); err != nil {
 					t.Fatalf("insert %d: %v", v, err)
 				}
+				cnt += 1
 				assertRBTProperties(t, tr)
+				if tr.Size() != cnt {
+					t.Fatalf("tree size is not %d after inserts: %d", cnt, tr.Size())
+				}
+			}
+			for _, v := range values {
+				if err := tr.Delete(v); err != nil {
+					t.Fatalf("delete %d: %v", v, err)
+				}
+				cnt -= 1
+				assertRBTProperties(t, tr)
+				if tr.Size() != cnt {
+					t.Fatalf("tree size is not %d after deletes: %d", cnt, tr.Size())
+				}
 			}
 		})
 	}
