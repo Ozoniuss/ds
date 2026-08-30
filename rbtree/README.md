@@ -82,7 +82,7 @@ go get github.com/Ozoniuss/ds
 
 ## Appendix
 
-- What are the problems with the above interface?
+### What are the problems with the above interface?
 
 The primary issue is that Go does not support [covariant types](https://go.dev/doc/faq#covariant_types). When designing the `RBTree` type I decided that I want the public methods to actually return the types themselves and not an interface, e.g.
 
@@ -102,7 +102,7 @@ func (t *RBT[T]) Root() *RBTNode[T] {
 
 But, this does not implement `Tree` as defined above.
 
-There are ways to work around it. For example, you can express your interfaces as follows. To be honest, I did not find find it obvious to understand why:
+There are ways to work around it. For example, you can express your interfaces as follows. To be honest, I did not find it obvious to understand why:
 
 ```Go
 type Node[T cmp.Ordered, N any] interface {
@@ -148,6 +148,16 @@ func CloneAll[C Cloner[C]](xs []C) []C {
 
 I recommend this article about [self-referential interfaces](https://go.dev/blog/generic-interfaces) (funnily enough, this article also models trees similarly when it comes to the defined types) which goes a bit more in depth. Still, I wasn't happy with the fact that you needed to supply a node type. After all, nodes are really more of an internal aspect of a tree. For a while I even considered not having them part of the interface. I wasn't happy with how the interface looked in general and also not convinced there was any benefit for having an extra layer of indirection.
 
-- Did you consider other tree libraries?
+### Did you consider other tree libraries?
 
-Yes, but I built mine for several reasons.
+Yes, but I built mine for several reasons. Main one was that I wanted a minimal API with the shape that I liked and similar semantics to `list` and `map` types (`nil` panics, an initialized object is valid even when empty). I wanted to have full control over how the API evolves in the future. Other reasons were having a pure Go implementation with no dependencies, a mechanism for bundling the complete code in a single file, no logging from the library, writing my own tests and benchmarks and just the fun of implementing it myself.
+
+Note that I'm not against providing more functionality for the tree library. For example, formatting trees is something I found very useful (see past [README](https://github.com/Ozoniuss/ds/blob/445a3540e2aba1f7e839ce6e146ff06c0a76a34a/tree/README.md)). But I wanted to package those as extensions (currently work in progress) and not have it part of the core library.
+
+Here are some other implementations:
+
+- [sortedset](https://github.com/wangjia184/sortedset) -  I didn't like the API, test suite is minimal and has other dependencies. I found a few others that seem to be mirrors, like [sortedset-go](https://github.com/zavitax/sortedset-go) and another [sortedset](https://github.com/matthew-hartman/sortedset).
+- [go-datastructures](https://github.com/Workiva/go-datastructures) - Provides much more than I need, has dependencies, also not really happy with the tree interface.
+- [go-set](https://github.com/hashicorp/go-set/tree/main) - This one is from Hashicorp and is a bit closer to what I wanted, but the public interface still has methods I didn't want (e.g. [Intersect](https://github.com/hashicorp/go-set/blob/main/treeset.go#L390C22-L390C31)), it also has dependencies and I wanted more test coverage.
+
+Honestly, I also haven't really researched in depth. There may be some that I missed which would have matched my requirements.
