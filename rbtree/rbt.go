@@ -514,6 +514,9 @@ func insertFixup[T cmp.Ordered](t *RBT[T], z *RBTNode[T]) {
 				y.color = _COLOR_BLACK
 				z.parent.parent.color = _COLOR_RED
 				z = z.parent.parent
+
+				// once we get to these branches, we will terminate in at most
+				// two iterations
 			} else if z == z.parent.right {
 				// this rotation will actually turn this case into the final
 				// else branch next iteration. remember that this left rotation
@@ -556,6 +559,8 @@ func insertFixup[T cmp.Ordered](t *RBT[T], z *RBTNode[T]) {
 			}
 		}
 	}
+	// we can only get in this case when terminating on branch 1, if z becomes
+	// the root (and the root's parent is TNIL which is black)
 	t.root.color = _COLOR_BLACK
 }
 
