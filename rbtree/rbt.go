@@ -161,6 +161,8 @@ func (t *RBT[T]) Insert(value T) error {
 	panicIfNilRBT(t)
 	t.lazyInit()
 
+	// create the root node if not available. classic textbook implementation
+	// handles this in insertFixup, but writing it here for better readability.
 	if t.root == t.tnil {
 		t.root = &RBTNode[T]{
 			parent: t.tnil,
@@ -174,13 +176,14 @@ func (t *RBT[T]) Insert(value T) error {
 		return nil
 	}
 
-	y := t.tnil
-	x := t.root
+	// start from the root and find which internal leaf z would become if
+	// inserted
+	y := t.tnil // prev
+	x := t.root // curr
 	z := &RBTNode[T]{
 		value: value,
 		count: 1,
 	}
-
 	for x != t.tnil {
 		y = x
 		if z.value < x.value {
@@ -195,10 +198,11 @@ func (t *RBT[T]) Insert(value T) error {
 			return nil
 		}
 	}
+	// at this point y is an internal leaf, and we set z as its child
 	z.parent = y
 
 	if y == t.tnil {
-		t.root = z
+		panic("new node should never have a tnil parent if root already exists")
 	} else if z.value < y.value {
 		y.left = z
 	} else {
@@ -208,6 +212,7 @@ func (t *RBT[T]) Insert(value T) error {
 	z.right = t.tnil
 	z.color = _COLOR_RED
 
+	// after regular insertion, rebalance and recolor if needed
 	insertFixup(t, z)
 	t.size++
 
@@ -375,6 +380,8 @@ func panicIfNilRBTNodeOrSentinel[T cmp.Ordered](n *RBTNode[T]) {
 // leftRotate brings the right child of x to its position. This operation preserves
 // the binary search tree property.
 //
+// Note that this method moves x to its (original) left child's position.
+//
 // It is assumed y is not tnil.
 //
 //	    y                                         x
@@ -413,6 +420,8 @@ func leftRotate[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
 // rightRotate brings the left child of y to its position. This operation preserves
 // the binary search tree property.
 //
+// Note that this method moves y to its (original) right child's position.
+//
 // It is assumed x is not tnil.
 //
 //	    y                                         x
@@ -448,7 +457,7 @@ func rightRotate[T cmp.Ordered](t *RBT[T], y *RBTNode[T]) {
 	y.parent = x
 }
 
-// transplant replaces one subtree with another subtree
+// transplant replaces one subtree with another subtree.
 func rbtransplant[T cmp.Ordered](t *RBT[T], u *RBTNode[T], v *RBTNode[T]) {
 	// u is root
 	if u.parent == t.tnil {
@@ -468,24 +477,69 @@ func treeMinimumRbt[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) *RBTNode[T] {
 	return x
 }
 
+// insertFixup restores the RBT properties after an insertion, starting from the
+// node being inserted. It will attempt to fix the following property:
+//
+// - If a node is red, then both its children are black (in case z's parent
+// was red) (4)
+//
+// The rest properties should continue to hold (my implementation handles inserting
+// the root explicitly so the root being black (2) holds at this point).
 func insertFixup[T cmp.Ordered](t *RBT[T], z *RBTNode[T]) {
+	// we only need to rebalance for a red parent. this loop has the followig
+	// invariants for each iteration:
+	//
+	// - z is red
+	// - if z.p is the root, z.p is black
+	// - if the tree violates any property, it will violate property (4) or
+	// property (2). Note that in the beginning it does not violate property (2),
+	// but it may end up doing so along the way.
+	//
+	// during each loop, z either moves up the tree, or we perform rotations
+	// and the loop terminates
 	for z.parent.color == _COLOR_RED {
+		// because the parent is red, it will definitely have an internal parent
+		// too.
 		if z.parent == z.parent.parent.left {
 			y := z.parent.parent.right
 			if y.color == _COLOR_RED {
+				// we can solve this with a simple recoloring. basically the
+				// grandparent becomes red and its children become black, which
+				// doesn't change the black path property. but now, root may
+				// have become red, or the parent of the grandparent will be
+				// red (and obviously z is still red since it points to that)
+				//
+				// z moves up two nodes here to advance the loop
 				z.parent.color = _COLOR_BLACK
 				y.color = _COLOR_BLACK
 				z.parent.parent.color = _COLOR_RED
 				z = z.parent.parent
 			} else if z == z.parent.right {
+				// this rotation will actually turn this case into the final
+				// else branch next iteration. remember that this left rotation
+				// moves z to its left child after becoming the parent. after
+				// this, z will still be red with a red parent.
 				z = z.parent
 				leftRotate(t, z)
 			} else {
+				// here we basically have a situation like this (I did not draw the
+				// other children, but they may be there):
+				//            C(b)                           B(b)
+				//       B(r)         ------>    z -->  A(r)     C(r)
+				//   A(r)  <---- z
+				///
+				// This one is a bit harder to follow but essentially only z
+				// is violating the RBT properties. z's children will stay the
+				// same, B's right child is already black and C's right child is
+				// also black (otherwise we would branch on the first statement of
+				// the loop) so boving them to be the children of C is still
+				// valid. We actually terminate the loop here.
 				z.parent.color = _COLOR_BLACK
 				z.parent.parent.color = _COLOR_RED
 				rightRotate(t, z.parent.parent)
 			}
 		} else {
+			// mirror of the situation above
 			y := z.parent.parent.left
 			if y.color == _COLOR_RED {
 				z.parent.color = _COLOR_BLACK
