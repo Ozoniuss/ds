@@ -219,6 +219,93 @@ func (t *RBT[T]) Insert(value T) error {
 	return nil
 }
 
+// insertFixup restores the RBT properties after an insertion, starting from the
+// node being inserted. It will attempt to fix the following property:
+//
+// - If a node is red, then both its children are black (in case z's parent
+// was red) (4)
+//
+// The rest properties should continue to hold (my implementation handles inserting
+// the root explicitly so the root being black (2) holds at this point).
+func insertFixup[T cmp.Ordered](t *RBT[T], z *RBTNode[T]) {
+	// we only need to rebalance for a red parent. this loop has the followig
+	// invariants for each iteration:
+	//
+	// - z is red
+	// - if z.p is the root, z.p is black
+	// - if the tree violates any property, it will violate property (4) or
+	// property (2). Note that in the beginning it does not violate property (2),
+	// but it may end up doing so along the way.
+	//
+	// during each loop, z either moves up the tree, or we perform rotations
+	// and the loop terminates
+	for z.parent.color == _COLOR_RED {
+		// because the parent is red, it will definitely have an internal parent
+		// too.
+		if z.parent == z.parent.parent.left {
+			y := z.parent.parent.right
+			if y.color == _COLOR_RED {
+				// we can solve this with a simple recoloring. basically the
+				// grandparent becomes red and its children become black, which
+				// doesn't change the black path property. but now, root may
+				// have become red, or the parent of the grandparent will be
+				// red (and obviously z is still red since it points to that)
+				//
+				// z moves up two nodes here to advance the loop
+				z.parent.color = _COLOR_BLACK
+				y.color = _COLOR_BLACK
+				z.parent.parent.color = _COLOR_RED
+				z = z.parent.parent
+
+				// once we get to these branches, we will terminate in at most
+				// two iterations
+			} else if z == z.parent.right {
+				// this rotation will actually turn this case into the final
+				// else branch next iteration. remember that this left rotation
+				// moves z to its left child after becoming the parent. after
+				// this, z will still be red with a red parent.
+				z = z.parent
+				leftRotate(t, z)
+			} else {
+				// here we basically have a situation like this (I did not draw the
+				// other children, but they may be there):
+				//            C(b)                           B(b)
+				//       B(r)         ------>    z -->  A(r)     C(r)
+				//   A(r)  <---- z
+				///
+				// This one is a bit harder to follow but essentially only z
+				// is violating the RBT properties. z's children will stay the
+				// same, B's right child is already black and C's right child is
+				// also black (otherwise we would branch on the first statement of
+				// the loop) so boving them to be the children of C is still
+				// valid. We actually terminate the loop here.
+				z.parent.color = _COLOR_BLACK
+				z.parent.parent.color = _COLOR_RED
+				rightRotate(t, z.parent.parent)
+			}
+		} else {
+			// mirror of the situation above
+			y := z.parent.parent.left
+			if y.color == _COLOR_RED {
+				z.parent.color = _COLOR_BLACK
+				y.color = _COLOR_BLACK
+				z.parent.parent.color = _COLOR_RED
+				z = z.parent.parent
+			} else if z == z.parent.left {
+				z = z.parent
+				rightRotate(t, z)
+			} else {
+				z.parent.color = _COLOR_BLACK
+				z.parent.parent.color = _COLOR_RED
+				leftRotate(t, z.parent.parent)
+			}
+		}
+	}
+	// we can only get in this case when terminating on branch 1, if z becomes
+	// the root (and the root's parent is TNIL which is black)
+	t.root.color = _COLOR_BLACK
+}
+
 func (t *RBT[T]) Delete(value T) error {
 	panicIfNilRBT(t)
 	t.lazyInit()
@@ -278,6 +365,59 @@ func (t *RBT[T]) Delete(value T) error {
 	}
 	t.size--
 	return nil
+}
+
+func rbDeleteFixup[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
+	for x != t.root && x.color == _COLOR_BLACK {
+		if x == x.parent.left {
+			w := x.parent.right
+			if w.color == _COLOR_RED {
+				w.color = _COLOR_BLACK
+				x.parent.color = _COLOR_RED
+				leftRotate(t, x.parent)
+				w = x.parent.right
+			}
+			if w.left.color == _COLOR_BLACK && w.right.color == _COLOR_BLACK {
+				w.color = _COLOR_RED
+				x = x.parent
+			} else if w.right.color == _COLOR_BLACK {
+				w.left.color = _COLOR_BLACK
+				w.color = _COLOR_RED
+				rightRotate(t, w)
+				w = x.parent.right
+			} else {
+				w.color = x.parent.color
+				x.parent.color = _COLOR_BLACK
+				w.right.color = _COLOR_BLACK
+				leftRotate(t, x.parent)
+				x = t.root
+			}
+		} else {
+			w := x.parent.left
+			if w.color == _COLOR_RED {
+				w.color = _COLOR_BLACK
+				x.parent.color = _COLOR_RED
+				rightRotate(t, x.parent)
+				w = x.parent.left
+			}
+			if w.right.color == _COLOR_BLACK && w.left.color == _COLOR_BLACK {
+				w.color = _COLOR_RED
+				x = x.parent
+			} else if w.left.color == _COLOR_BLACK {
+				w.right.color = _COLOR_BLACK
+				w.color = _COLOR_RED
+				leftRotate(t, w)
+				w = x.parent.left
+			} else {
+				w.color = x.parent.color
+				x.parent.color = _COLOR_BLACK
+				w.left.color = _COLOR_BLACK
+				rightRotate(t, x.parent)
+				x = t.root
+			}
+		}
+	}
+	x.color = _COLOR_BLACK
 }
 
 // RBTNode represents a tree node.
@@ -475,144 +615,4 @@ func treeMinimumRbt[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) *RBTNode[T] {
 		x = x.left
 	}
 	return x
-}
-
-// insertFixup restores the RBT properties after an insertion, starting from the
-// node being inserted. It will attempt to fix the following property:
-//
-// - If a node is red, then both its children are black (in case z's parent
-// was red) (4)
-//
-// The rest properties should continue to hold (my implementation handles inserting
-// the root explicitly so the root being black (2) holds at this point).
-func insertFixup[T cmp.Ordered](t *RBT[T], z *RBTNode[T]) {
-	// we only need to rebalance for a red parent. this loop has the followig
-	// invariants for each iteration:
-	//
-	// - z is red
-	// - if z.p is the root, z.p is black
-	// - if the tree violates any property, it will violate property (4) or
-	// property (2). Note that in the beginning it does not violate property (2),
-	// but it may end up doing so along the way.
-	//
-	// during each loop, z either moves up the tree, or we perform rotations
-	// and the loop terminates
-	for z.parent.color == _COLOR_RED {
-		// because the parent is red, it will definitely have an internal parent
-		// too.
-		if z.parent == z.parent.parent.left {
-			y := z.parent.parent.right
-			if y.color == _COLOR_RED {
-				// we can solve this with a simple recoloring. basically the
-				// grandparent becomes red and its children become black, which
-				// doesn't change the black path property. but now, root may
-				// have become red, or the parent of the grandparent will be
-				// red (and obviously z is still red since it points to that)
-				//
-				// z moves up two nodes here to advance the loop
-				z.parent.color = _COLOR_BLACK
-				y.color = _COLOR_BLACK
-				z.parent.parent.color = _COLOR_RED
-				z = z.parent.parent
-
-				// once we get to these branches, we will terminate in at most
-				// two iterations
-			} else if z == z.parent.right {
-				// this rotation will actually turn this case into the final
-				// else branch next iteration. remember that this left rotation
-				// moves z to its left child after becoming the parent. after
-				// this, z will still be red with a red parent.
-				z = z.parent
-				leftRotate(t, z)
-			} else {
-				// here we basically have a situation like this (I did not draw the
-				// other children, but they may be there):
-				//            C(b)                           B(b)
-				//       B(r)         ------>    z -->  A(r)     C(r)
-				//   A(r)  <---- z
-				///
-				// This one is a bit harder to follow but essentially only z
-				// is violating the RBT properties. z's children will stay the
-				// same, B's right child is already black and C's right child is
-				// also black (otherwise we would branch on the first statement of
-				// the loop) so boving them to be the children of C is still
-				// valid. We actually terminate the loop here.
-				z.parent.color = _COLOR_BLACK
-				z.parent.parent.color = _COLOR_RED
-				rightRotate(t, z.parent.parent)
-			}
-		} else {
-			// mirror of the situation above
-			y := z.parent.parent.left
-			if y.color == _COLOR_RED {
-				z.parent.color = _COLOR_BLACK
-				y.color = _COLOR_BLACK
-				z.parent.parent.color = _COLOR_RED
-				z = z.parent.parent
-			} else if z == z.parent.left {
-				z = z.parent
-				rightRotate(t, z)
-			} else {
-				z.parent.color = _COLOR_BLACK
-				z.parent.parent.color = _COLOR_RED
-				leftRotate(t, z.parent.parent)
-			}
-		}
-	}
-	// we can only get in this case when terminating on branch 1, if z becomes
-	// the root (and the root's parent is TNIL which is black)
-	t.root.color = _COLOR_BLACK
-}
-
-func rbDeleteFixup[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
-	for x != t.root && x.color == _COLOR_BLACK {
-		if x == x.parent.left {
-			w := x.parent.right
-			if w.color == _COLOR_RED {
-				w.color = _COLOR_BLACK
-				x.parent.color = _COLOR_RED
-				leftRotate(t, x.parent)
-				w = x.parent.right
-			}
-			if w.left.color == _COLOR_BLACK && w.right.color == _COLOR_BLACK {
-				w.color = _COLOR_RED
-				x = x.parent
-			} else if w.right.color == _COLOR_BLACK {
-				w.left.color = _COLOR_BLACK
-				w.color = _COLOR_RED
-				rightRotate(t, w)
-				w = x.parent.right
-			} else {
-				w.color = x.parent.color
-				x.parent.color = _COLOR_BLACK
-				w.right.color = _COLOR_BLACK
-				leftRotate(t, x.parent)
-				x = t.root
-			}
-		} else {
-			w := x.parent.left
-			if w.color == _COLOR_RED {
-				w.color = _COLOR_BLACK
-				x.parent.color = _COLOR_RED
-				rightRotate(t, x.parent)
-				w = x.parent.left
-			}
-			if w.right.color == _COLOR_BLACK && w.left.color == _COLOR_BLACK {
-				w.color = _COLOR_RED
-				x = x.parent
-			} else if w.left.color == _COLOR_BLACK {
-				w.right.color = _COLOR_BLACK
-				w.color = _COLOR_RED
-				leftRotate(t, w)
-				w = x.parent.left
-			} else {
-				w.color = x.parent.color
-				x.parent.color = _COLOR_BLACK
-				w.left.color = _COLOR_BLACK
-				rightRotate(t, x.parent)
-				x = t.root
-			}
-		}
-	}
-	x.color = _COLOR_BLACK
 }
