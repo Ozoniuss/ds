@@ -82,32 +82,12 @@ type RBT[T cmp.Ordered] struct {
 	// Note that all nil-valued nodes are set to the same tnil sentinel, meaning
 	// that the parent of the sentinel is also unset.
 	tnil *RBTNode[T]
-	// Whether the tree allows duplicate values or not.
-	allowDuplicates bool
-}
-
-type RBTOpts[T cmp.Ordered] func(t *RBT[T])
-
-func WithAllowedDuplicates[T cmp.Ordered]() RBTOpts[T] {
-	return func(t *RBT[T]) {
-		t.allowDuplicates = true
-	}
 }
 
 // NewRBT returns an initialized red black tree.
-func NewRBT[T cmp.Ordered](opts ...RBTOpts[T]) *RBT[T] {
+func NewRBT[T cmp.Ordered]() *RBT[T] {
 	t := &RBT[T]{}
 	t.lazyInit()
-	tnil := t.tnil
-
-	for _, o := range opts {
-		o(t)
-	}
-
-	// assert that options do not change root and tnil
-	if t.tnil != tnil || t.root != tnil {
-		panic("options must not modify root and tnil during initialization")
-	}
 
 	return t
 }
@@ -190,9 +170,7 @@ func (t *RBT[T]) Insert(value T) {
 		} else if z.value > x.value {
 			x = x.right
 		} else {
-			if t.allowDuplicates {
-				x.count += 1
-			}
+			// found the node in the tree
 			return
 		}
 	}
@@ -315,11 +293,6 @@ func (t *RBT[T]) Delete(value T) {
 		} else if value > z.value {
 			z = z.right
 		} else {
-			// removing a value with count of 1 may require transplant operations
-			if t.allowDuplicates && z.count > 1 {
-				z.count -= 1
-				return
-			}
 			break
 		}
 	}
