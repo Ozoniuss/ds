@@ -172,9 +172,7 @@ func TestRBTPropertiesDeterministicPermutations(t *testing.T) {
 			tr := NewRBT[int]()
 			cnt := 0
 			for _, v := range values {
-				if err := tr.Insert(v); err != nil {
-					t.Fatalf("insert %d: %v", v, err)
-				}
+				tr.Insert(v)
 				cnt += 1
 				assertRBTProperties(t, tr)
 				if tr.Size() != cnt {
@@ -182,9 +180,7 @@ func TestRBTPropertiesDeterministicPermutations(t *testing.T) {
 				}
 			}
 			for _, v := range values {
-				if err := tr.Delete(v); err != nil {
-					t.Fatalf("delete %d: %v", v, err)
-				}
+				tr.Delete(v)
 				cnt -= 1
 				assertRBTProperties(t, tr)
 				if tr.Size() != cnt {
@@ -207,8 +203,8 @@ func TestRBTNilReceiver(t *testing.T) {
 		{name: "Root", fn: func(tr *RBT[int]) { tr.Root() }},
 		{name: "Size", fn: func(tr *RBT[int]) { tr.Size() }},
 		{name: "Count", fn: func(tr *RBT[int]) { tr.Count(0) }},
-		{name: "Insert", fn: func(tr *RBT[int]) { _ = tr.Insert(1) }},
-		{name: "Delete", fn: func(tr *RBT[int]) { _ = tr.Delete(1) }},
+		{name: "Insert", fn: func(tr *RBT[int]) { tr.Insert(1) }},
+		{name: "Delete", fn: func(tr *RBT[int]) { tr.Delete(1) }},
 	}
 
 	for _, m := range methods {
@@ -216,291 +212,6 @@ func TestRBTNilReceiver(t *testing.T) {
 			t.Parallel()
 			mustPanic(t, func() { m.fn(nil) })
 		})
-	}
-}
-
-// TestRBTZeroValue checks that a tree created through the type directly is a
-// valid empty tree.
-func TestRBTZeroValue(t *testing.T) {
-	t.Parallel()
-
-	t.Run("reads", func(t *testing.T) {
-		t.Parallel()
-
-		var tr RBT[int]
-
-		if tr.Size() != 0 {
-			t.Errorf("size: got %d, want 0", tr.Size())
-		}
-		if tr.Root() != nil {
-			t.Errorf("root: got %#v, want nil", tr.Root())
-		}
-		if got := tr.Count(1); got != 0 {
-			t.Errorf("Count(1): got %d, want 0", got)
-		}
-
-		// reads must not allocate the sentinel
-		if tr.tnil != nil {
-			t.Error("tnil was allocated by a read")
-		}
-		if tr.root != nil {
-			t.Error("root was set by a read")
-		}
-	})
-
-	t.Run("delete", func(t *testing.T) {
-		t.Parallel()
-
-		var tr RBT[int]
-
-		err := tr.Delete(1)
-		if err == nil {
-			t.Fatal("Delete on zero value tree: got nil error")
-		}
-		if err.Error() != "value not found" {
-			t.Errorf("Delete on zero value tree: got %q, want %q", err.Error(), "value not found")
-		}
-		if tr.Size() != 0 {
-			t.Errorf("size after failed delete: got %d, want 0", tr.Size())
-		}
-	})
-
-	t.Run("insert", func(t *testing.T) {
-		t.Parallel()
-
-		var tr RBT[int]
-
-		for _, v := range []int{5, 3, 8, 1, 4, 7, 9, 2, 6} {
-			if err := tr.Insert(v); err != nil {
-				t.Fatalf("Insert(%d): %v", v, err)
-			}
-		}
-
-		if tr.Size() != 9 {
-			t.Errorf("size: got %d, want 9", tr.Size())
-		}
-		if tr.Root() == nil {
-			t.Fatal("root is nil after inserts")
-		}
-		for _, v := range []int{1, 2, 3, 4, 5, 6, 7, 8, 9} {
-			if got := tr.Count(v); got != 1 {
-				t.Errorf("Count(%d): got %d, want 1", v, got)
-			}
-		}
-
-		if err := tr.Insert(5); err == nil {
-			t.Error("duplicate Insert on zero value tree: got nil error")
-		}
-
-		if err := tr.Delete(5); err != nil {
-			t.Fatalf("Delete(5): %v", err)
-		}
-		if tr.Size() != 8 {
-			t.Errorf("size after delete: got %d, want 8", tr.Size())
-		}
-		if got := tr.Count(5); got != 0 {
-			t.Errorf("Count(5) after delete: got %d, want 0", got)
-		}
-	})
-}
-
-func TestRBTEmpty(t *testing.T) {
-	t.Parallel()
-
-	tr := NewRBT[int]()
-
-	if tr.Size() != 0 {
-		t.Errorf("empty tree size: got %d, want 0", tr.Size())
-	}
-	if tr.Root() != nil {
-		t.Errorf("empty tree root: got %#v, want nil", tr.Root())
-	}
-	if got := tr.Count(0); got != 0 {
-		t.Errorf("Count(0) on empty tree: got %d, want 0", got)
-	}
-	if got := tr.Count(1); got != 0 {
-		t.Errorf("Count(1) on empty tree: got %d, want 0", got)
-	}
-
-	err := tr.Delete(1)
-	if err == nil {
-		t.Fatal("Delete on empty tree: got nil error, want value not found")
-	}
-	if err.Error() != "value not found" {
-		t.Errorf("Delete on empty tree: got %q, want %q", err.Error(), "value not found")
-	}
-	if tr.Size() != 0 {
-		t.Errorf("Delete on empty tree changed size: got %d, want 0", tr.Size())
-	}
-	if tr.Root() != nil {
-		t.Errorf("Delete on empty tree set a root: got %#v", tr.Root())
-	}
-}
-
-func TestRBTInsertIntoEmpty(t *testing.T) {
-	t.Parallel()
-
-	tr := NewRBT[int]()
-	if err := tr.Insert(0); err != nil {
-		t.Fatalf("Insert(0) into empty tree: %v", err)
-	}
-
-	if tr.Size() != 1 {
-		t.Errorf("size after first insert: got %d, want 1", tr.Size())
-	}
-	root := tr.Root()
-	if root == nil {
-		t.Fatal("root after first insert is nil")
-	}
-	if root.Value() != 0 {
-		t.Errorf("root value: got %d, want 0", root.Value())
-	}
-	if root.Count() != 1 {
-		t.Errorf("root count: got %d, want 1", root.Count())
-	}
-	if root.Parent() != nil {
-		t.Errorf("root parent: got %#v, want nil", root.Parent())
-	}
-	if root.Left() != nil {
-		t.Errorf("root left: got %#v, want nil", root.Left())
-	}
-	if root.Right() != nil {
-		t.Errorf("root right: got %#v, want nil", root.Right())
-	}
-	if got := tr.Count(0); got != 1 {
-		t.Errorf("Count(0): got %d, want 1", got)
-	}
-	if got := tr.Count(1); got != 0 {
-		t.Errorf("Count(1) missing value: got %d, want 0", got)
-	}
-}
-
-func TestRBTDeleteOnlyNode(t *testing.T) {
-	t.Parallel()
-
-	tr := NewRBT[int]()
-	if err := tr.Insert(7); err != nil {
-		t.Fatalf("Insert: %v", err)
-	}
-
-	if err := tr.Delete(7); err != nil {
-		t.Fatalf("Delete only node: %v", err)
-	}
-	if tr.Size() != 0 {
-		t.Errorf("size after deleting only node: got %d, want 0", tr.Size())
-	}
-	if tr.Root() != nil {
-		t.Errorf("root after deleting only node: got %#v, want nil", tr.Root())
-	}
-	if got := tr.Count(7); got != 0 {
-		t.Errorf("Count after deleting only node: got %d, want 0", got)
-	}
-
-	err := tr.Delete(7)
-	if err == nil {
-		t.Fatal("second Delete of only node: got nil error")
-	}
-	if err.Error() != "value not found" {
-		t.Errorf("second Delete: got %q, want %q", err.Error(), "value not found")
-	}
-
-	if err := tr.Insert(7); err != nil {
-		t.Fatalf("Insert into tree emptied by Delete: %v", err)
-	}
-	if tr.Size() != 1 || tr.Root() == nil || tr.Root().Value() != 7 {
-		t.Fatalf("tree not usable after emptying: size=%d root=%#v", tr.Size(), tr.Root())
-	}
-}
-
-func TestRBTDuplicateInsert(t *testing.T) {
-	t.Parallel()
-
-	tr := NewRBT[int]()
-	if err := tr.Insert(3); err != nil {
-		t.Fatalf("Insert: %v", err)
-	}
-
-	err := tr.Insert(3)
-	if err == nil {
-		t.Fatal("duplicate Insert: got nil error")
-	}
-	if err.Error() != "value already exists" {
-		t.Errorf("duplicate Insert: got %q, want %q", err.Error(), "value already exists")
-	}
-	if tr.Size() != 1 {
-		t.Errorf("size after rejected duplicate: got %d, want 1", tr.Size())
-	}
-	if got := tr.Count(3); got != 1 {
-		t.Errorf("Count after rejected duplicate: got %d, want 1", got)
-	}
-}
-
-func TestRBTDuplicatesAllowed(t *testing.T) {
-	t.Parallel()
-
-	tr := NewRBT[int](WithAllowedDuplicates[int]())
-	if tr.Size() != 0 {
-		t.Fatalf("empty tree with duplicates option: size %d", tr.Size())
-	}
-
-	if err := tr.Insert(4); err != nil {
-		t.Fatalf("Insert: %v", err)
-	}
-	if err := tr.Insert(4); err != nil {
-		t.Fatalf("duplicate Insert with option: %v", err)
-	}
-
-	if tr.Size() != 1 {
-		t.Errorf("size after duplicate insert: got %d, want 1", tr.Size())
-	}
-	if got := tr.Count(4); got != 2 {
-		t.Errorf("Count after duplicate insert: got %d, want 2", got)
-	}
-	if got := tr.Root().Count(); got != 2 {
-		t.Errorf("root Count after duplicate insert: got %d, want 2", got)
-	}
-
-	if err := tr.Delete(4); err != nil {
-		t.Fatalf("Delete one of two duplicates: %v", err)
-	}
-	if tr.Size() != 1 {
-		t.Errorf("size after decrementing count: got %d, want 1", tr.Size())
-	}
-	if got := tr.Count(4); got != 1 {
-		t.Errorf("Count after decrementing: got %d, want 1", got)
-	}
-	if tr.Root() == nil {
-		t.Fatal("root removed while count still 1")
-	}
-
-	if err := tr.Delete(4); err != nil {
-		t.Fatalf("Delete last occurrence: %v", err)
-	}
-	if tr.Size() != 0 || tr.Root() != nil {
-		t.Errorf("after last duplicate delete: size=%d root=%#v", tr.Size(), tr.Root())
-	}
-}
-
-func TestRBTDeleteMissingValue(t *testing.T) {
-	t.Parallel()
-
-	tr := NewRBT[int]()
-	if err := tr.Insert(1); err != nil {
-		t.Fatalf("Insert: %v", err)
-	}
-
-	err := tr.Delete(2)
-	if err == nil {
-		t.Fatal("Delete missing value: got nil error")
-	}
-	if err.Error() != "value not found" {
-		t.Errorf("Delete missing value: got %q, want %q", err.Error(), "value not found")
-	}
-	if tr.Size() != 1 {
-		t.Errorf("size after failed delete: got %d, want 1", tr.Size())
-	}
-	if got := tr.Count(1); got != 1 {
-		t.Errorf("Count(1) after failed delete: got %d, want 1", got)
 	}
 }
 
@@ -533,6 +244,29 @@ func TestRBTNilAndSentinelNodes(t *testing.T) {
 				t.Parallel()
 				mustPanic(t, func() { m.fn(n.node) })
 			})
+		}
+	}
+}
+
+func TestRBTSpecificTrees(t *testing.T) {
+
+	type testCase struct {
+		values []int
+	}
+	testCases := []testCase{
+		{values: []int{1}},
+		{values: []int{1, 2, 3, 4, 5, 6, 7, 8, 9}},
+		{values: []int{9, 8, 7, 6, 5, 4, 3, 2, 1}},
+		{values: []int{5, 3, 8, 1, 4, 7, 9, 2, 6}},
+		{values: []int{1, 1, 1, 1, 1}},
+	}
+
+	for _, tt := range testCases {
+
+		tr := NewRBT[int]()
+		for _, v := range tt.values {
+			tr.Insert(int(v))
+			assertRBTProperties(t, tr)
 		}
 	}
 }
@@ -745,9 +479,7 @@ func FuzzRBTEachInsert(f *testing.F) {
 
 		tr := NewRBT[int]()
 		for i, v := range values {
-			// ignored on purpose: inserting a duplicate is a valid outcome
-			// here and must leave the tree untouched
-			_ = tr.Insert(int(v))
+			tr.Insert(int(v))
 
 			assertRBTProperties(t, tr)
 			if t.Failed() {

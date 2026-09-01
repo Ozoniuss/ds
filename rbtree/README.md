@@ -4,6 +4,8 @@ Provides a red black tree implementation in Go. Oriented towards competitive pro
 
 The library exposes a minimal public interface. In general, the way it thinks about modelling trees looks something like below. Note that this is not an actual interface exposed by the rbtree package, primarily because there isn't really a reason to abstract it under an interface, but also for some technical reasons (see appendix).
 
+Additionally, note that `Insert` and `Delete` don't actually return errors, since it is assumed that the operations being performed are always valid. This is by design and consistent with the writes allowed on `list` and `map` types. However, they also don't return any information about the change that happened. This can be limiting (e.g. you only want to insert up to K elements in a tree) and I am open to extending it in the future, but for I felt that the of use-cases where knowing what the operation did was limited. Adding a return type to the API is a backwards-compatible change and starting with an empty return type allows me to think a bit more about what should actually be returned before locking in the return type.
+
 ```go
 // Tree represents the possible operations on binary search trees. Various tree
 // types (e.g. regular BST, balanced BST, red black tree etc.) implement this
@@ -26,17 +28,16 @@ type Tree[T cmp.Ordered] interface {
 	// Use this method if you need to determine whether a value belongs to the
 	// tree or not.
 	Count(value T) int
-	// Insert a value to the binary search tree. Implementations that require
-	// storing unique values will return an error if that value already exists.
-	// Callers may choose to ignore the error if they just want to ensure the
-	// value is present in the tree.
-	Insert(value T) error
-	// Delete a value from the binary search tree. Implementations that allow
-	// storing multiple values of the same type should only remove one occurence
-	// of the value.
-	// Callers may choose to ignore the error if they just want to ensure the
-	// value is deleted from a tree supporting only unique values.
-	Delete(value T) error
+	// Insert a value to the binary search tree. Implementations should
+    // guarantee the value exists or its count was increased by 1 in the case of
+    // trees accepting multiple values, once this method was called. Otherwise,
+    // the method must panic.
+	Insert(value T)
+	// Delete a value from the binary search tree. Implementations should
+    // guarantee the value no longer exists or its count was decreased by 1 in
+    // the case of  trees accepting multiple values, once this method was
+    // called. Otherwise, the method must panic.
+	Delete(value T)
 }
 
 // Node represents a node in a binary search tree. It is read-only.

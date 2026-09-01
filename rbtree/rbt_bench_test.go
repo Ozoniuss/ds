@@ -59,9 +59,7 @@ func BenchmarkRBTInsertIncreasingSorted(b *testing.B) {
 			for b.Loop() {
 				tr := NewRBT[int]()
 				for i := range n {
-					if err := tr.Insert(i); err != nil {
-						b.Fatalf("insert %d: %v", i, err)
-					}
+					tr.Insert(i)
 				}
 			}
 			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*n), "ns/insert")
@@ -90,9 +88,7 @@ func BenchmarkRBTInsertRandom(b *testing.B) {
 			for b.Loop() {
 				tr := NewRBT[int]()
 				for _, v := range randomValues[n] {
-					if err := tr.Insert(v); err != nil {
-						b.Fatalf("insert %d: %v", v, err)
-					}
+					tr.Insert(v)
 				}
 			}
 			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*n), "ns/insert")

@@ -2,7 +2,6 @@ package rbtree
 
 import (
 	"cmp"
-	"errors"
 )
 
 /*
@@ -155,9 +154,8 @@ func (t *RBT[T]) Count(value T) int {
 	return 0
 }
 
-// Insert adds a value to the tree. If the tree is not configured to accept multiple
-// values, it will return an error when the same value is inserted twice.
-func (t *RBT[T]) Insert(value T) error {
+// Insert adds a value to the tree.
+func (t *RBT[T]) Insert(value T) {
 	panicIfNilRBT(t)
 	t.lazyInit()
 
@@ -173,7 +171,7 @@ func (t *RBT[T]) Insert(value T) error {
 			count:  1,
 		}
 		t.size = 1
-		return nil
+		return
 	}
 
 	// start from the root and find which internal leaf z would become if
@@ -186,16 +184,16 @@ func (t *RBT[T]) Insert(value T) error {
 	}
 	for x != t.tnil {
 		y = x
+
 		if z.value < x.value {
 			x = x.left
 		} else if z.value > x.value {
 			x = x.right
 		} else {
-			if !t.allowDuplicates {
-				return errors.New("value already exists")
+			if t.allowDuplicates {
+				x.count += 1
 			}
-			x.count += 1
-			return nil
+			return
 		}
 	}
 	// at this point y is an internal leaf, and we set z as its child
@@ -215,8 +213,6 @@ func (t *RBT[T]) Insert(value T) error {
 	// after regular insertion, rebalance and recolor if needed
 	insertFixup(t, z)
 	t.size++
-
-	return nil
 }
 
 // insertFixup restores the RBT properties after an insertion, starting from the
@@ -306,13 +302,10 @@ func insertFixup[T cmp.Ordered](t *RBT[T], z *RBTNode[T]) {
 	t.root.color = _COLOR_BLACK
 }
 
-func (t *RBT[T]) Delete(value T) error {
+// Delete removes a value from the tree.
+func (t *RBT[T]) Delete(value T) {
 	panicIfNilRBT(t)
 	t.lazyInit()
-
-	if t.root == t.tnil {
-		return errors.New("value not found")
-	}
 
 	// find z
 	z := t.root
@@ -325,14 +318,18 @@ func (t *RBT[T]) Delete(value T) error {
 			// removing a value with count of 1 may require transplant operations
 			if t.allowDuplicates && z.count > 1 {
 				z.count -= 1
-				return nil
+				return
 			}
 			break
 		}
 	}
+
+	// nothing to delete
 	if z == t.tnil {
-		return errors.New("value not found")
+		return
 	}
+
+	// at this point, z is an internal leaf
 
 	y := z
 	yorigcolor := y.color
@@ -364,7 +361,6 @@ func (t *RBT[T]) Delete(value T) error {
 		rbDeleteFixup(t, x)
 	}
 	t.size--
-	return nil
 }
 
 func rbDeleteFixup[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
@@ -484,12 +480,6 @@ func sentinel[T cmp.Ordered]() *RBTNode[T] {
 func panicIfNilRBT[T cmp.Ordered](t *RBT[T]) {
 	if t == nil {
 		panic("nil rbt")
-	}
-}
-
-func panicIfNilRBTNode[T cmp.Ordered](n *RBTNode[T]) {
-	if n == nil {
-		panic("nil node")
 	}
 }
 
