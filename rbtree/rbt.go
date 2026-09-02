@@ -305,10 +305,8 @@ func (t *RBT[T]) Delete(value T) {
 	// at this point, z is an internal leaf. delete like in a regular tree, then
 	// fixup to re-color and re-balance.
 	//
-	// y track the node that is moved or removed from the tree
-	//
-	// the only reason we set y here and not in the big else branch is to avoid
-	// duplication at the end (we only rebalance when a black node was changed).
+	// y tracks the node that is moved or removed from the tree, x tracks the
+	// subtree that moves to its location.
 	y := z
 	yorigcolor := y.color
 	var x *RBTNode[T]
@@ -363,8 +361,23 @@ func (t *RBT[T]) Delete(value T) {
 	t.size--
 }
 
+// rbtDeleteFixup handles recoloring and rebalancing if a black node was removed
+// from the tree. This can happen in the following scenarios:
+//
+// - We removed the root and it had a red child moved to its position.
+// - One (the right?) child of the node y that moved and its parent were both red.
+// - Any simple paths containing y now have one less black node if y was black.
 func rbtDeleteFixup[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
+	// The proof of this is actually quite complicated. Let's assume that "x"
+	// has two colors, and when we moved it to y's location we essentially added
+	// a black color to it. This means black paths preserve that length, but
+	// we're violating property 1 now.
+	//
+	// within this loop, x will always be "doubly" black given
+	//
+	// TODO: finish documentation for this
 	for x != t.root && x.color == _COLOR_BLACK {
+
 		if x == x.parent.left {
 			w := x.parent.right
 			if w.color == _COLOR_RED {
