@@ -34,6 +34,7 @@ func BenchmarkSliceIncreasingSorted(b *testing.B) {
 				}
 			}
 			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*n), "ns/insert")
+			b.ReportMetric(float64(b.N*n)/b.Elapsed().Seconds(), "inserts/sec")
 		})
 	}
 }
@@ -49,6 +50,7 @@ func BenchmarkSliceDecreasingSorted(b *testing.B) {
 				}
 			}
 			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*n), "ns/insert")
+			b.ReportMetric(float64(b.N*n)/b.Elapsed().Seconds(), "inserts/sec")
 		})
 	}
 }
@@ -63,6 +65,7 @@ func BenchmarkRBTInsertIncreasingSorted(b *testing.B) {
 				}
 			}
 			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*n), "ns/insert")
+			b.ReportMetric(float64(b.N*n)/b.Elapsed().Seconds(), "inserts/sec")
 		})
 	}
 }
@@ -78,6 +81,7 @@ func BenchmarkSliceSortRandom(b *testing.B) {
 				}
 			}
 			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*n), "ns/insert")
+			b.ReportMetric(float64(b.N*n)/b.Elapsed().Seconds(), "inserts/sec")
 		})
 	}
 }
@@ -92,6 +96,7 @@ func BenchmarkRBTInsertRandom(b *testing.B) {
 				}
 			}
 			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*n), "ns/insert")
+			b.ReportMetric(float64(b.N*n)/b.Elapsed().Seconds(), "inserts/sec")
 		})
 	}
 }
