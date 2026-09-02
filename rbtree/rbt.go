@@ -302,41 +302,68 @@ func (t *RBT[T]) Delete(value T) {
 		return
 	}
 
-	// at this point, z is an internal leaf
-
+	// at this point, z is an internal leaf. delete like in a regular tree, then
+	// fixup to re-color and re-balance.
+	//
+	// y track the node that is moved or removed from the tree
+	//
+	// the only reason we set y here and not in the big else branch is to avoid
+	// duplication at the end (we only rebalance when a black node was changed).
 	y := z
 	yorigcolor := y.color
 	var x *RBTNode[T]
 
 	if z.left == t.tnil {
+		// if z has at most one internal child, we transplant (note that we may
+		// transplant a sentinel child too).
 		x = z.right
-		rbtransplant(t, z, z.right)
+		rbtransplant(t, z, z.right) // z.right may be tnil
 	} else if z.right == t.tnil {
 		x = z.left
-		rbtransplant(t, z, z.left)
+		rbtransplant(t, z, z.left) // z.left may be tnil
 	} else {
+		// set y to the successor of z. y has no left children
 		y = treeMinimumRbt(t, z.right)
 		yorigcolor = y.color
+
+		// move y's right subtree to y, since (node) y will move to z
 		x = y.right
 		if y.parent == z {
+			// z.right is right skewed
 			x.parent = y
 		} else {
-			rbtransplant(t, y, y.right)
+			rbtransplant(t, y, y.right) // y.right may be tnil
+			// note that this is ok because y does nto change in transplant. y will
+			// become x here  and will be "detached" from its original right child
 			y.right = z.right
 			y.right.parent = y
 		}
+
+		// at this point y is some sort of incomplete node with only its right
+		// side completely formed. change its parent via transplant and attach
+		// the right subtree (from z)
 		rbtransplant(t, z, y)
 		y.left = z.left
 		y.left.parent = y
 		y.color = z.color
 	}
+
+	// Took the explanation from the textbook since it's pretty good. We don't
+	// need a fixup if we moved a red node because:
+	// 1. No black-heights in the tree have changed.
+	// 2. No red nodes have been made adjacent. Because y takes z’s place in the
+	// tree, along with z’s color, we cannot have two adjacent red nodes at y’s new
+	// position in the tree. In addition, if y was not z’s right child, then y’s original
+	// right child x replaces y in the tree. If y is red, then x must be black, and so
+	// replacing y by x cannot cause two red nodes to become adjacent.
+	// 3. Since y could not have been the root if it was red, the root remains black.
 	if yorigcolor == _COLOR_BLACK {
-		rbDeleteFixup(t, x)
+		rbtDeleteFixup(t, x) // x may be tnil, see above what can be tnil
 	}
 	t.size--
 }
 
-func rbDeleteFixup[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
+func rbtDeleteFixup[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
 	for x != t.root && x.color == _COLOR_BLACK {
 		if x == x.parent.left {
 			w := x.parent.right
@@ -560,9 +587,18 @@ func rightRotate[T cmp.Ordered](t *RBT[T], y *RBTNode[T]) {
 	y.parent = x
 }
 
-// transplant replaces one subtree with another subtree.
+// transplant replaces one subtree u with another subtree v. It only changes the
+// parent v points to, and the child of u's parent to become v. Note that u
+// remains unchanged.
 func rbtransplant[T cmp.Ordered](t *RBT[T], u *RBTNode[T], v *RBTNode[T]) {
-	// u is root
+	if t == nil || u == nil || v == nil {
+		panic("rbtransplant: called on nil tree or node")
+	}
+	// note that transplant may be called on a sentinel destination
+	if u.isSentinel() {
+		panic("rbtransplant: called on sentinel destination")
+	}
+	// u is root, v becomes root
 	if u.parent == t.tnil {
 		t.root = v
 	} else if u == u.parent.left {
@@ -573,6 +609,8 @@ func rbtransplant[T cmp.Ordered](t *RBT[T], u *RBTNode[T], v *RBTNode[T]) {
 	v.parent = u.parent
 }
 
+// treeMinimumRbt finds the minimum value (the leftmost internal node) of the
+// subtree rooted at t.
 func treeMinimumRbt[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) *RBTNode[T] {
 	for x.left != t.tnil {
 		x = x.left
