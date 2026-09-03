@@ -224,7 +224,6 @@ func TestRBTNilAndSentinelNodes(t *testing.T) {
 	}
 	methods := []method{
 		{name: "Value", fn: func(n *RBTNode[int]) { n.Value() }},
-		{name: "Count", fn: func(n *RBTNode[int]) { n.Count() }},
 		{name: "Parent", fn: func(n *RBTNode[int]) { n.Parent() }},
 		{name: "Left", fn: func(n *RBTNode[int]) { n.Left() }},
 		{name: "Right", fn: func(n *RBTNode[int]) { n.Right() }},
@@ -280,8 +279,8 @@ func TestLeftRotateMissingRightChildPanics(t *testing.T) {
 		t.Parallel()
 
 		tr := NewRBT[int]()
-		x := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
-		a := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 1, count: 1}
+		x := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 2}
+		a := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 1}
 		x.left = a
 		tr.root = x
 		tr.size = 2
@@ -293,9 +292,9 @@ func TestLeftRotateMissingRightChildPanics(t *testing.T) {
 		t.Parallel()
 
 		tr := NewRBT[int]()
-		p := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 4, count: 1}
-		x := &RBTNode[int]{parent: p, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
-		a := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 1, count: 1}
+		p := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 4}
+		x := &RBTNode[int]{parent: p, left: tr.tnil, right: tr.tnil, value: 2}
+		a := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 1}
 		p.left = x
 		x.left = a
 		tr.root = p
@@ -322,8 +321,8 @@ func TestRightRotateMissingLeftChildPanics(t *testing.T) {
 		t.Parallel()
 
 		tr := NewRBT[int]()
-		y := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
-		c := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 3, count: 1}
+		y := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 2}
+		c := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 3}
 		y.right = c
 		tr.root = y
 		tr.size = 2
@@ -335,9 +334,9 @@ func TestRightRotateMissingLeftChildPanics(t *testing.T) {
 		t.Parallel()
 
 		tr := NewRBT[int]()
-		p := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 1, count: 1}
-		y := &RBTNode[int]{parent: p, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
-		c := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 3, count: 1}
+		p := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 1}
+		y := &RBTNode[int]{parent: p, left: tr.tnil, right: tr.tnil, value: 2}
+		c := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 3}
 		p.right = y
 		y.right = c
 		tr.root = p
@@ -367,8 +366,8 @@ func TestRotateSingleChild(t *testing.T) {
 		t.Parallel()
 
 		tr := NewRBT[int]()
-		x := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 1, count: 1}
-		y := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
+		x := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 1}
+		y := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 2}
 		x.right = y
 		tr.root = x
 		tr.size = 2
@@ -405,8 +404,8 @@ func TestRotateSingleChild(t *testing.T) {
 		t.Parallel()
 
 		tr := NewRBT[int]()
-		y := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 2, count: 1}
-		x := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 1, count: 1}
+		y := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 2}
+		x := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 1}
 		y.left = x
 		tr.root = y
 		tr.size = 2

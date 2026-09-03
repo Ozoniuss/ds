@@ -128,7 +128,7 @@ func (t *RBT[T]) Count(value T) int {
 		} else if value > c.value {
 			c = c.right
 		} else {
-			return c.Count()
+			return 1
 		}
 	}
 	return 0
@@ -148,7 +148,6 @@ func (t *RBT[T]) Insert(value T) {
 			right:  t.tnil,
 			value:  value,
 			color:  _COLOR_BLACK,
-			count:  1,
 		}
 		t.size = 1
 		return
@@ -160,7 +159,6 @@ func (t *RBT[T]) Insert(value T) {
 	x := t.root // curr
 	z := &RBTNode[T]{
 		value: value,
-		count: 1,
 	}
 	for x != t.tnil {
 		y = x
@@ -371,11 +369,9 @@ func rbtDeleteFixup[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
 	// The proof of this is actually quite complicated. Let's assume that "x"
 	// has two colors, and when we moved it to y's location we essentially added
 	// a black color to it. This means black paths preserve that length, but
-	// we're violating property 1 now.
+	// we're violating property 1 now (every node is either red or black).
 	//
-	// within this loop, x will always be "doubly" black given
-	//
-	// TODO: finish documentation for this
+	// within this loop, x will always point to a "doubly" black node
 	for x != t.root && x.color == _COLOR_BLACK {
 
 		if x == x.parent.left {
@@ -402,6 +398,7 @@ func rbtDeleteFixup[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
 				x = t.root
 			}
 		} else {
+			// see above
 			w := x.parent.left
 			if w.color == _COLOR_RED {
 				w.color = _COLOR_BLACK
@@ -436,7 +433,6 @@ type RBTNode[T cmp.Ordered] struct {
 	right    *RBTNode[T]
 	value    T
 	color    string
-	count    int
 	sentinel bool
 }
 
@@ -444,12 +440,6 @@ func (n *RBTNode[T]) Value() T {
 	panicIfNilRBTNodeOrSentinel(n)
 
 	return n.value
-}
-
-func (n *RBTNode[T]) Count() int {
-	panicIfNilRBTNodeOrSentinel(n)
-
-	return n.count
 }
 
 func (n *RBTNode[T]) Parent() *RBTNode[T] {
