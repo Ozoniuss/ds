@@ -50,7 +50,7 @@ import (
 // the root would need to be placed on the left of its child's representation
 // which would result in a negative x position without adjusting the child
 // representation).
-func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int) []string {
+func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, shouldCenter bool) []string {
 	if n == nil || n.isSentinel() {
 		panic("BuildLines: n must be an internal node")
 	}
@@ -61,10 +61,10 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int) []stri
 
 	var leftLines, rightLines []string
 	if n.Left() != nil {
-		leftLines = BuildLines(n.Left(), minDistBetweenSubtrees)
+		leftLines = BuildLines(n.Left(), minDistBetweenSubtrees, shouldCenter)
 	}
 	if n.Right() != nil {
-		rightLines = BuildLines(n.Right(), minDistBetweenSubtrees)
+		rightLines = BuildLines(n.Right(), minDistBetweenSubtrees, shouldCenter)
 	}
 
 	if len(leftLines) == 0 && len(rightLines) == 0 {
@@ -87,22 +87,18 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int) []stri
 
 		// we need to have a valid "middle" in order to satisfy 2, so adjust offset
 		// in case parent ends up with a floating point x position.
-		lstart := strings.IndexFunc(leftLines[0], func(r rune) bool {
-			return r != ' '
-		})
-		rstart := strings.IndexFunc(rightLines[0], func(r rune) bool {
-			return r != ' '
-		})
+		lstart := findCenter(leftLines[0], shouldCenter)
+		rstart := findCenter(rightLines[0], shouldCenter)
+		fmt.Println("lines", leftLines[0], rightLines[0], lstart, rstart, roffset)
 		rstart += roffset
 		if (lstart+rstart)%2 == 1 {
 			roffset += 1
 		}
+		fmt.Println("fixed", roffset, lstart, rstart+1)
 	} else if n.Right() != nil {
-		rstart := strings.IndexFunc(rightLines[0], func(r rune) bool {
-			return r != ' '
-		})
+		rstart := findCenter(rightLines[0], shouldCenter)
 		// node will need to be at position 0, so right child needs to start at
-		// position at least 2 in order to properly draw the connection.
+		// position at least 2 + pad in order to properly draw the connection.
 		roffset = max(0, 2-rstart)
 	}
 
@@ -138,71 +134,109 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int) []stri
 
 	// first line will either have one word or two words
 	firstLine := out[0]
+	fmt.Println("merged", firstLine)
 	var start1, end1, start2 int
-	start1 = strings.IndexFunc(firstLine, func(r rune) bool {
-		return r != ' '
-	})
-	if start1 == -1 {
-		panic("BuildLines: first line of merged children must have at least 1 label")
-	}
-	end1 = strings.IndexByte(firstLine[start1:], ' ')
-	if end1 == -1 {
-		end1 = len(firstLine)
-	} else {
-		end1 += start1
-	}
+	start1, end1 = findCenterAndEnd(firstLine, shouldCenter)
 
 	// there are two words
 	if n.Left() != nil && n.Right() != nil {
-		start2 = end1 + strings.IndexFunc(firstLine[end1:], func(r rune) bool {
-			return r != ' '
-		})
+		start2 = end1 + findCenter(firstLine[end1:], shouldCenter)
 	}
 
+	pad := getPad(n)
+	fmt.Println("pad", pad)
+	var pos int
+	ret := []string{}
 	// write the parent and its connecting lines
 	if n.Left() != nil && n.Right() != nil {
+		fmt.Println("after merge", start1, end1, start2)
 		if (start1+start2)%2 != 0 {
 			panic("BuildLines: cannot find integer middle position for parent")
 		}
-		pos := (start1 + start2) / 2
-		parentLine := strings.Repeat(" ", pos) + fmt.Sprintf("%v", n.Value())
+		pos = (start1 + start2) / 2
+		parentLine := fmt.Sprintf("%v", n.Value())
 		toplines := []string{parentLine}
 		diff := 1 // between left and right connection
 		// draw a connection until you reach the left and right children
 		for empty := pos - 1; empty > start1; empty-- {
-			line := ""
-			for range empty {
-				line += " "
-			}
+			line := strings.Repeat(" ", empty)
 			line += "/"
-			for range diff {
-				line += " "
-			}
+			line += strings.Repeat(" ", diff)
 			diff += 2
 			line += "\\"
 			toplines = append(toplines, line)
 		}
 
-		return append(toplines, out...)
+		ret = append(toplines, out...)
 	}
 
 	if n.Left() == nil {
-		pos := start1 - 2
-		parentLine := strings.Repeat(" ", pos) + fmt.Sprintf("%v", n.Value())
+		pos = start1 - 2
+		parentLine := fmt.Sprintf("%v", n.Value())
 		secondline := strings.Repeat(" ", pos+1) + "\\"
 		toplines := []string{parentLine, secondline}
 
-		return append(toplines, out...)
+		ret = append(toplines, out...)
 	}
 
 	if n.Right() == nil {
-		pos := start1 + 2
-		firstline := strings.Repeat(" ", pos) + fmt.Sprintf("%v", n.Value())
+		pos = start1 + 2
+		parentLine := fmt.Sprintf("%v", n.Value())
 		secondline := strings.Repeat(" ", pos-1) + "/"
-		toplines := []string{firstline, secondline}
+		toplines := []string{parentLine, secondline}
 
-		return append(toplines, out...)
+		ret = append(toplines, out...)
 	}
 
-	panic("BuildLines: internal leaves should have been handled separately")
+	if pad > pos {
+		for i := 1; i < len(ret); i++ {
+			ret[i] = strings.Repeat(" ", pad-pos) + ret[i]
+		}
+		return ret
+	} else {
+		ret[0] = strings.Repeat(" ", pos-pad) + ret[0]
+	}
+	return ret
+
+}
+
+// getPad returns how much you need to move the node value to the left
+// when printing so it's centered.
+func getPad[T cmp.Ordered](n *RBTNode[T]) int {
+	return (len(fmt.Sprintf("%v", n.Value())) - 1) / 2
+}
+
+func findCenter(line string, center bool) int {
+	start := strings.IndexFunc(line, func(r rune) bool {
+		return r != ' '
+	})
+	end := strings.IndexByte(line[start:], ' ')
+	if end == -1 {
+		end = len(line)
+	} else {
+		end += start
+	}
+	lenght := end - start
+	if center {
+		start += (lenght - 1) / 2
+	}
+	fmt.Println("called with line", line, "found", start)
+	return start
+}
+
+func findCenterAndEnd(line string, center bool) (int, int) {
+	start := strings.IndexFunc(line, func(r rune) bool {
+		return r != ' '
+	})
+	end := strings.IndexByte(line[start:], ' ')
+	if end == -1 {
+		end = len(line)
+	} else {
+		end += start
+	}
+	lenght := end - start
+	if center {
+		start += (lenght - 1) / 2
+	}
+	return start, end
 }
