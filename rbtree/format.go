@@ -143,8 +143,6 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 		start2 = end1 + findCenter(firstLine[end1:], shouldCenter)
 	}
 
-	pad := getPad(n)
-	fmt.Println("pad", pad)
 	var pos int
 	ret := []string{}
 	// write the parent and its connecting lines
@@ -154,7 +152,7 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 			panic("BuildLines: cannot find integer middle position for parent")
 		}
 		pos = (start1 + start2) / 2
-		parentLine := fmt.Sprintf("%v", n.Value())
+		parentLine := strings.Repeat(" ", pos) + fmt.Sprintf("%v", n.Value())
 		toplines := []string{parentLine}
 		diff := 1 // between left and right connection
 		// draw a connection until you reach the left and right children
@@ -172,7 +170,7 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 
 	if n.Left() == nil {
 		pos = start1 - 2
-		parentLine := fmt.Sprintf("%v", n.Value())
+		parentLine := strings.Repeat(" ", pos) + fmt.Sprintf("%v", n.Value())
 		secondline := strings.Repeat(" ", pos+1) + "\\"
 		toplines := []string{parentLine, secondline}
 
@@ -181,20 +179,25 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 
 	if n.Right() == nil {
 		pos = start1 + 2
-		parentLine := fmt.Sprintf("%v", n.Value())
+		parentLine := strings.Repeat(" ", pos) + fmt.Sprintf("%v", n.Value())
 		secondline := strings.Repeat(" ", pos-1) + "/"
 		toplines := []string{parentLine, secondline}
 
 		ret = append(toplines, out...)
 	}
 
-	if pad > pos {
-		for i := 1; i < len(ret); i++ {
-			ret[i] = strings.Repeat(" ", pad-pos) + ret[i]
+	if shouldCenter {
+		// strip original whitelines
+		ret[0] = ret[0][pos:]
+		pad := getPad(n)
+		if pad > pos {
+			for i := 1; i < len(ret); i++ {
+				ret[i] = strings.Repeat(" ", pad-pos) + ret[i]
+			}
+			return ret
+		} else {
+			ret[0] = strings.Repeat(" ", pos-pad) + ret[0]
 		}
-		return ret
-	} else {
-		ret[0] = strings.Repeat(" ", pos-pad) + ret[0]
 	}
 	return ret
 
