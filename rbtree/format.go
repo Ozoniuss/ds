@@ -94,12 +94,10 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 		// in case parent ends up with a floating point x position.
 		lstart := findCenter(leftLines[0], shouldCenter)
 		rstart := findCenter(rightLines[0], shouldCenter)
-		fmt.Println("lines", leftLines[0], rightLines[0], lstart, rstart, roffset)
 		rstart += roffset
 		if (lstart+rstart)%2 == 1 {
 			roffset += 1
 		}
-		fmt.Println("fixed", roffset, lstart, rstart+1)
 	} else if n.Right() != nil {
 		rstart := findCenter(rightLines[0], shouldCenter)
 		// node will need to be at position 0, so right child needs to start at
@@ -245,7 +243,6 @@ func findCenter(line string, center bool) int {
 	if center {
 		start += (lenght - 1) / 2
 	}
-	fmt.Println("called with line", line, "found", start)
 	return start
 }
 
