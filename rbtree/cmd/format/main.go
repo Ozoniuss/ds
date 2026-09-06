@@ -3,18 +3,21 @@ package main
 import (
 	"fmt"
 
-	tree "github.com/Ozoniuss/ds/rbtree"
+	"github.com/Ozoniuss/ds/rbtree"
 )
+
+var ttyColorReset = "\033[0m"
+var ttyRed = "\033[31m"
 
 func main() {
 
-	t1 := tree.NewRBT[int]()
+	t1 := rbtree.NewRBT[int]()
 	t1.Insert(1)
 	t1.Insert(3)
 	t1.Insert(4)
 	t1.Insert(2)
 
-	t4 := tree.NewRBT[int]()
+	t4 := rbtree.NewRBT[int]()
 
 	t4.Insert(26111111)
 	t4.Insert(17111111)
@@ -41,11 +44,11 @@ func main() {
 	t4.Insert(3511111)
 	t4.Insert(3911111)
 
-	lines := tree.BuildLines(t4.Root(), 2, true)
+	lines := rbtree.BuildLines(t4.Root(), 2, true, true)
 	for _, l := range lines {
 		fmt.Println(l)
 	}
-	lines = tree.BuildLines(t1.Root(), 2, true)
+	lines = rbtree.BuildLines(t1.Root(), 2, true, true)
 	for _, l := range lines {
 		fmt.Println(l)
 	}

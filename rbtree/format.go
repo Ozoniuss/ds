@@ -14,6 +14,11 @@ import (
 // between a left child's non-empty characters and a right child's non-empty
 // characters on every line of their representation.
 //
+// shouldCenter configures where the edges are drawn with respect to the node
+// label. Normally, the formatter will draw them around the first character of the
+// label. With this option enabled, it will try to draw the edges to point to
+// approximately the node's center.
+//
 // The two most important properties of the printing algorithm are as follows:
 // 1. The way a subtree is printed will look identical regardless of what other
 // nodes are in a tree.
@@ -50,21 +55,21 @@ import (
 // the root would need to be placed on the left of its child's representation
 // which would result in a negative x position without adjusting the child
 // representation).
-func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, shouldCenter bool) []string {
+func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, shouldCenter bool, useTestFormat bool) []string {
 	if n == nil || n.isSentinel() {
 		panic("BuildLines: n must be an internal node")
 	}
 
 	if n.Left() == nil && n.Right() == nil {
-		return []string{fmt.Sprintf("%v", n.Value())}
+		return []string{getLabel(n, useTestFormat)}
 	}
 
 	var leftLines, rightLines []string
 	if n.Left() != nil {
-		leftLines = BuildLines(n.Left(), minDistBetweenSubtrees, shouldCenter)
+		leftLines = BuildLines(n.Left(), minDistBetweenSubtrees, shouldCenter, useTestFormat)
 	}
 	if n.Right() != nil {
-		rightLines = BuildLines(n.Right(), minDistBetweenSubtrees, shouldCenter)
+		rightLines = BuildLines(n.Right(), minDistBetweenSubtrees, shouldCenter, useTestFormat)
 	}
 
 	if len(leftLines) == 0 && len(rightLines) == 0 {
@@ -134,7 +139,6 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 
 	// first line will either have one word or two words
 	firstLine := out[0]
-	fmt.Println("merged", firstLine)
 	var start1, end1, start2 int
 	start1, end1 = findCenterAndEnd(firstLine, shouldCenter)
 
@@ -147,12 +151,11 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 	ret := []string{}
 	// write the parent and its connecting lines
 	if n.Left() != nil && n.Right() != nil {
-		fmt.Println("after merge", start1, end1, start2)
 		if (start1+start2)%2 != 0 {
 			panic("BuildLines: cannot find integer middle position for parent")
 		}
 		pos = (start1 + start2) / 2
-		parentLine := strings.Repeat(" ", pos) + fmt.Sprintf("%v", n.Value())
+		parentLine := strings.Repeat(" ", pos) + getLabel(n, useTestFormat)
 		toplines := []string{parentLine}
 		diff := 1 // between left and right connection
 		// draw a connection until you reach the left and right children
@@ -170,7 +173,7 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 
 	if n.Left() == nil {
 		pos = start1 - 2
-		parentLine := strings.Repeat(" ", pos) + fmt.Sprintf("%v", n.Value())
+		parentLine := strings.Repeat(" ", pos) + getLabel(n, useTestFormat)
 		secondline := strings.Repeat(" ", pos+1) + "\\"
 		toplines := []string{parentLine, secondline}
 
@@ -179,7 +182,7 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 
 	if n.Right() == nil {
 		pos = start1 + 2
-		parentLine := strings.Repeat(" ", pos) + fmt.Sprintf("%v", n.Value())
+		parentLine := strings.Repeat(" ", pos) + getLabel(n, useTestFormat)
 		secondline := strings.Repeat(" ", pos-1) + "/"
 		toplines := []string{parentLine, secondline}
 
@@ -187,9 +190,12 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 	}
 
 	if shouldCenter {
-		// strip original whitelines
+		// remove any whitespace we have drawn for the parent
 		ret[0] = ret[0][pos:]
-		pad := getPad(n)
+		pad := getPad(n, useTestFormat)
+		// in this case the parent does not fit after moving it to the left, so
+		// we basically "shift" every line to the right so that the parent can
+		// be written at the beginning of the line
 		if pad > pos {
 			for i := 1; i < len(ret); i++ {
 				ret[i] = strings.Repeat(" ", pad-pos) + ret[i]
@@ -205,8 +211,24 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 
 // getPad returns how much you need to move the node value to the left
 // when printing so it's centered.
-func getPad[T cmp.Ordered](n *RBTNode[T]) int {
-	return (len(fmt.Sprintf("%v", n.Value())) - 1) / 2
+func getPad[T cmp.Ordered](n *RBTNode[T], useTestFormat bool) int {
+	label := getLabel(n, useTestFormat)
+	return (len(label) - 1) / 2
+}
+
+func getLabel[T cmp.Ordered](n *RBTNode[T], useTestFormat bool) string {
+	label := fmt.Sprintf("%v", n.Value())
+	if useTestFormat {
+		switch n.color {
+		case _COLOR_RED:
+			label += "[R]"
+		case _COLOR_BLACK:
+			label += "[B]"
+		default:
+			panic("invalid color")
+		}
+	}
+	return label
 }
 
 func findCenter(line string, center bool) int {
