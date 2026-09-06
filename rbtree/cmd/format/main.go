@@ -29,26 +29,34 @@ func main() {
 	t4.Insert(12111111)
 	t4.Insert(13111111)
 	// t4.Insert(14)
-	t4.Insert(3111111)
+	// t4.Insert(3111111)
 
-	t4.Insert(2111111)
-	t4.Insert(1911111)
-	t4.Insert(2311111)
-	t4.Insert(2411111)
-	t4.Insert(2511111)
-	t4.Insert(2011111)
-	t4.Insert(470011111)
-	t4.Insert(3011111)
-	t4.Insert(2811111)
-	t4.Insert(3811111)
-	t4.Insert(3511111)
-	t4.Insert(3911111)
+	// t4.Insert(2111111)
+	// t4.Insert(1911111)
+	// t4.Insert(2311111)
+	// t4.Insert(2411111)
+	// t4.Insert(2511111)
+	// t4.Insert(2011111)
+	// t4.Insert(470011111)
+	// t4.Insert(3011111)
+	// t4.Insert(2811111)
+	// t4.Insert(3811111)
+	// t4.Insert(3511111)
+	// t4.Insert(3911111)
 
-	lines := rbtree.BuildLines(t4.Root(), 2, true, true)
+	lines := rbtree.BuildLines(t4.Root(), rbtree.SHAPE_SQUARE, 2, true, false)
 	for _, l := range lines {
 		fmt.Println(l)
 	}
-	lines = rbtree.BuildLines(t1.Root(), 2, true, true)
+	lines = rbtree.BuildLines(t4.Root(), rbtree.SHAPE_TREE, 2, true, false)
+	for _, l := range lines {
+		fmt.Println(l)
+	}
+	lines = rbtree.BuildLines(t1.Root(), rbtree.SHAPE_SQUARE, 3, false, false)
+	for _, l := range lines {
+		fmt.Println(l)
+	}
+	lines = rbtree.BuildLines(t1.Root(), rbtree.SHAPE_TREE, 2, true, false)
 	for _, l := range lines {
 		fmt.Println(l)
 	}

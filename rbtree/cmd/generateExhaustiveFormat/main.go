@@ -30,14 +30,15 @@ func permute(values []int) [][]int {
 }
 
 func main() {
-	n := flag.Int("n", 6, "length of the list [1..n] to permute")
+	// n := flag.Int("n", 6, "length of the list [1..n] to permute")
 	out := flag.String("out", "rbtree/testdata/exhaustiveFormat.txt", "output file path")
 	flag.Parse()
 
-	values := make([]int, *n)
-	for i := range values {
-		values[i] = i + 1
-	}
+	// values := make([]int, *n)
+	// for i := range values {
+	// 	values[i] = i + 1
+	// }
+	values := []int{352345623, 4324232, 21, 4354, 19990593303, 32}
 
 	perms := permute(values)
 
@@ -54,7 +55,7 @@ func main() {
 			tr.Insert(v)
 		}
 
-		lines := rbtree.BuildLines(tr.Root(), 2, true, true)
+		lines := rbtree.BuildLines(tr.Root(), rbtree.SHAPE_SQUARE, 2, true, true)
 		for _, l := range lines {
 			sb.WriteString(l)
 			sb.WriteString("\n")
