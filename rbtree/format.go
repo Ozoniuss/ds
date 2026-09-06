@@ -6,6 +6,21 @@ import (
 	"strings"
 )
 
+// TODO: make this work with characters that are longer than 1 byte as well.
+const (
+	CONNECTOR_LEFT_ONLY  = "/"
+	CONNECTOR_RIGHT_ONLY = "\\"
+	CONNECTOR_LEFT_END   = "v"
+	CONNECTOR_RIGHT_END  = "v"
+	CONNECTOR_MIDDLE     = "+"
+	CONNECTOR_VLINE      = "-"
+)
+
+const (
+	SHAPE_TREE   = 0
+	SHAPE_SQUARE = 1
+)
+
 // BuildLines recursively builds the tree's visual representation as an array of
 // strings, each element representing a line from the tree's string representation
 // starting with the root.
@@ -55,7 +70,7 @@ import (
 // the root would need to be placed on the left of its child's representation
 // which would result in a negative x position without adjusting the child
 // representation).
-func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, shouldCenter bool, useTestFormat bool) []string {
+func BuildLines[T cmp.Ordered](n *RBTNode[T], shape int, minDistBetweenSubtrees int, shouldCenter bool, useTestFormat bool) []string {
 	if n == nil || n.isSentinel() {
 		panic("BuildLines: n must be an internal node")
 	}
@@ -66,10 +81,10 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 
 	var leftLines, rightLines []string
 	if n.Left() != nil {
-		leftLines = BuildLines(n.Left(), minDistBetweenSubtrees, shouldCenter, useTestFormat)
+		leftLines = BuildLines(n.Left(), shape, minDistBetweenSubtrees, shouldCenter, useTestFormat)
 	}
 	if n.Right() != nil {
-		rightLines = BuildLines(n.Right(), minDistBetweenSubtrees, shouldCenter, useTestFormat)
+		rightLines = BuildLines(n.Right(), shape, minDistBetweenSubtrees, shouldCenter, useTestFormat)
 	}
 
 	if len(leftLines) == 0 && len(rightLines) == 0 {
@@ -103,6 +118,11 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 		// node will need to be at position 0, so right child needs to start at
 		// position at least 2 + pad in order to properly draw the connection.
 		roffset = max(0, 2-rstart)
+
+		// TODO: fix this more nicely
+		// if shape == SHAPE_SQUARE {
+		// 	roffset = max(0, 1-rstart)
+		// }
 	}
 
 	// Merge the left and right lines. Because we're calculating the offset based
@@ -155,34 +175,59 @@ func BuildLines[T cmp.Ordered](n *RBTNode[T], minDistBetweenSubtrees int, should
 		pos = (start1 + start2) / 2
 		parentLine := strings.Repeat(" ", pos) + getLabel(n, useTestFormat)
 		toplines := []string{parentLine}
-		diff := 1 // between left and right connection
-		// draw a connection until you reach the left and right children
-		for empty := pos - 1; empty > start1; empty-- {
-			line := strings.Repeat(" ", empty)
-			line += "/"
-			line += strings.Repeat(" ", diff)
-			diff += 2
-			line += "\\"
-			toplines = append(toplines, line)
+		switch shape {
+		case SHAPE_TREE:
+			diff := 1 // between left and right connection
+			// draw a connection until you reach the left and right children
+			for empty := pos - 1; empty > start1; empty-- {
+				line := strings.Repeat(" ", empty)
+				line += "/"
+				line += strings.Repeat(" ", diff)
+				diff += 2
+				line += "\\"
+				toplines = append(toplines, line)
+			}
+		case SHAPE_SQUARE:
+			width := (start2 - start1)
+			connectorLine := strings.Repeat(" ", start1) + CONNECTOR_LEFT_END + strings.Repeat(CONNECTOR_VLINE, width/2-1) + CONNECTOR_MIDDLE + strings.Repeat(CONNECTOR_VLINE, width/2-1) + CONNECTOR_RIGHT_END
+			toplines = append(toplines, connectorLine)
 		}
 
 		ret = append(toplines, out...)
 	}
 
 	if n.Left() == nil {
-		pos = start1 - 2
-		parentLine := strings.Repeat(" ", pos) + getLabel(n, useTestFormat)
-		secondline := strings.Repeat(" ", pos+1) + "\\"
-		toplines := []string{parentLine, secondline}
+		var toplines []string
+		switch shape {
+		case SHAPE_TREE:
+			pos = start1 - 2
+			parentLine := strings.Repeat(" ", pos) + getLabel(n, useTestFormat)
+			secondline := strings.Repeat(" ", pos+1) + "\\"
+			toplines = []string{parentLine, secondline}
+		case SHAPE_SQUARE:
+			pos = start1 - 2
+			parentLine := strings.Repeat(" ", pos) + getLabel(n, useTestFormat)
+			secondline := strings.Repeat(" ", pos+1) + CONNECTOR_RIGHT_ONLY
+			toplines = []string{parentLine, secondline}
+		}
 
 		ret = append(toplines, out...)
 	}
 
 	if n.Right() == nil {
-		pos = start1 + 2
-		parentLine := strings.Repeat(" ", pos) + getLabel(n, useTestFormat)
-		secondline := strings.Repeat(" ", pos-1) + "/"
-		toplines := []string{parentLine, secondline}
+		var toplines []string
+		switch shape {
+		case SHAPE_TREE:
+			pos := start1 + 2
+			parentLine := strings.Repeat(" ", pos) + getLabel(n, useTestFormat)
+			secondline := strings.Repeat(" ", pos-1) + "/"
+			toplines = []string{parentLine, secondline}
+		case SHAPE_SQUARE:
+			pos := start1 + 2
+			parentLine := strings.Repeat(" ", pos) + getLabel(n, useTestFormat)
+			secondline := strings.Repeat(" ", pos-1) + CONNECTOR_LEFT_ONLY
+			toplines = []string{parentLine, secondline}
+		}
 
 		ret = append(toplines, out...)
 	}
