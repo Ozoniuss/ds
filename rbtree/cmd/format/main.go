@@ -44,7 +44,7 @@ func main() {
 	// t4.Insert(3511111)
 	// t4.Insert(3911111)
 
-	lines := rbtree.BuildLines(t4.Root(), rbtree.SHAPE_SQUARE, 2, true, false)
+	lines := rbtree.BuildLines(t4.Root(), rbtree.SHAPE_SQUARE, 2, true, true)
 	for _, l := range lines {
 		fmt.Println(l)
 	}
@@ -52,7 +52,7 @@ func main() {
 	for _, l := range lines {
 		fmt.Println(l)
 	}
-	lines = rbtree.BuildLines(t1.Root(), rbtree.SHAPE_SQUARE, 3, false, false)
+	lines = rbtree.BuildLines(t1.Root(), rbtree.SHAPE_SQUARE, 3, false, true)
 	for _, l := range lines {
 		fmt.Println(l)
 	}

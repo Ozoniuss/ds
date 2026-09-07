@@ -3,128 +3,72 @@ package rbtree
 import (
 	"fmt"
 	"math/rand/v2"
+	"strconv"
 	"strings"
 	"testing"
 )
 
-type visualCase struct {
-	name string
-
-	buildBefore func(tr *RBT[int])
-	op          func(tr *RBT[int])
-
-	beforeDrawing string
-	afterDrawing  string
+// formatRBTForTests returns a compact representation of a tree that can be
+// parsed back easily into the original tree. This representation is used to
+// help understand what each operation on the RBT does.
+func formatRBTForTests(root *RBT[int]) string {
+	lines := BuildLines(root.Root(), SHAPE_SQUARE, 2, true, true)
+	return strings.Join(lines, "\n")
 }
 
-func runVisualCase(t *testing.T, tc visualCase) {
-	t.Helper()
-
-	t.Run(tc.name, func(t *testing.T) {
-		tr := NewRBT[int]()
-		tc.buildBefore(tr)
-		before := drawTree(tr)
-		if got, want := strings.Join(before, "\n"), strings.TrimPrefix(tc.beforeDrawing, "\n"); got != want {
-			t.Fatalf("before tree does not match its drawing:\ngot:\n%s\nwant:\n%s", got, want)
+// parseRBTFromTests rebuilds the tree from its string representation in tests.
+// It leverages the property that we can rebuild a regular binary search tree
+// by simply inserting its nodes in BFS order. While this doesn't always work
+// for RBT, we can instead create the "shape" by performing regular BST insertions
+// and then just apply the color to each node.
+//
+// The format used in tests has the property that lines will alternatively
+// contain either just node labels or tree edges, therefore we only need to
+// read the lines containing labels and parse them. Tests use positive integer
+// values as labels and the color is encoded at the end of each number.
+//
+//	                      15111111[B]
+//	           v---------------+---------------v
+//	      10111111[R]                     26111111[R]
+//	    v------+------v                 v------+------v
+//	7111111[B]   12111111[B]       17111111[B]   41111111[B]
+//	                   \               /
+//	               13111111[R]   16111111[R]
+//
+// TODO: may be worth testing that the parser is actually correct too, for
+// completeness.
+func parseRBTFromTests(repr string) *RBT[int] {
+	parts := strings.Split(repr, "\n")
+	root := &RBT[int]{}
+	// we actually don't care at all about edges, since inserting in BFS order
+	// on a regular tree
+	for i := 0; i < len(parts); i += 2 {
+		numstrs := strings.Fields(parts[i])
+		for _, n := range numstrs {
+			num, err := strconv.Atoi(n[:len(n)-3])
+			if err != nil {
+				msg := "parseRBTFromTests: parsing number " + n
+				panic(msg)
+			}
+			var color string
+			colorstr := n[len(n)-2]
+			switch colorstr {
+			case 'R':
+				color = _COLOR_RED
+			case 'B':
+				color = _COLOR_BLACK
+			default:
+				msg := "parseRBTFromTests: parsing color " + string(colorstr)
+				panic(msg)
+			}
+			bstInsertNode(root, num, color)
 		}
-
-		tc.op(tr)
-
-		after := drawTree(tr)
-		if got, want := strings.Join(after, "\n"), strings.TrimPrefix(tc.afterDrawing, "\n"); got != want {
-			t.Fatalf("after tree does not match its drawing:\ngot:\n%s\nwant:\n%s", got, want)
-		}
-	})
+	}
+	return root
 }
 
-func drawTree(tr *RBT[int]) []string {
-	if tr.Root() == nil {
-		return nil
-	}
-	return BuildLines(tr.Root(), SHAPE_TREE, 2, true, false)
-}
-
-func TestLeftRotate(t *testing.T) {
-	t.Parallel()
-
-	cases := []visualCase{
-		{
-			name: "x=1 has only a right child",
-
-			buildBefore: func(tr *RBT[int]) {
-				x := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 1}
-				y := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 2}
-				x.right = y
-				tr.root = x
-				tr.size = 2
-			},
-
-			op: func(tr *RBT[int]) {
-				leftRotate(tr, tr.root)
-			},
-
-			beforeDrawing: `
-1
- \
-  2`,
-			afterDrawing: `
-  2
- /
-1`,
-		},
-		{
-			name: "x=2 and its right child both have two children",
-
-			buildBefore: func(tr *RBT[int]) {
-				x := &RBTNode[int]{parent: tr.tnil, value: 2}
-				a := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 1}
-				y := &RBTNode[int]{parent: x, value: 4}
-				b := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 3}
-				c := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 5}
-				x.left, x.right = a, y
-				y.left, y.right = b, c
-				tr.root = x
-				tr.size = 5
-			},
-
-			op: func(tr *RBT[int]) {
-				leftRotate(tr, tr.root)
-			},
-
-			beforeDrawing: `
-  2
- / \
-1   4
-   / \
-  3   5`,
-			afterDrawing: `
-    4
-   / \
-  2   5
- / \
-1   3`,
-		},
-	}
-
-	for _, tc := range cases {
-		runVisualCase(t, tc)
-	}
-}
-
-func equalTrees(a, b *RBT[int]) bool {
-	var walk func(x, y *RBTNode[int]) bool
-	walk = func(x, y *RBTNode[int]) bool {
-		if x == nil || y == nil {
-			return x == nil && y == nil
-		}
-		if x.Value() != y.Value() || x.color != y.color {
-			return false
-		}
-		return walk(x.Left(), y.Left()) && walk(x.Right(), y.Right())
-	}
-	return walk(a.Root(), b.Root())
-}
-
+// This test is used to prove that trees can be recreated by inserting nodes in
+// BFS order in a regular tree then applying colors.
 func TestBFSReinsertionReproducesTree(t *testing.T) {
 	rng := rand.New(rand.NewPCG(6, 9))
 
@@ -155,6 +99,202 @@ func TestBFSReinsertionReproducesTree(t *testing.T) {
 	}
 }
 
+type testcase struct {
+	name string
+
+	x int
+	y int
+
+	leftRotateXresult  string
+	rightRotateYresult string
+}
+
+func findNode(tr *RBT[int], value int) *RBTNode[int] {
+	n := tr.root
+	for n != tr.tnil {
+		if value < n.value {
+			n = n.left
+		} else if value > n.value {
+			n = n.right
+		} else {
+			return n
+		}
+	}
+	panic(fmt.Sprintf("findNode: value %d not found in tree", value))
+}
+
+func runtc(t *testing.T, tc testcase) {
+	t.Helper()
+
+	t.Run(tc.name, func(t *testing.T) {
+		t.Parallel()
+
+		before := strings.TrimPrefix(tc.rightRotateYresult, "\n")
+		after := strings.TrimPrefix(tc.leftRotateXresult, "\n")
+
+		// Note that we can test both given leftRotate and rightRotate are each
+		// other's inverse function.
+
+		t.Run(fmt.Sprintf("x=%d/left rotate", tc.x), func(t *testing.T) {
+			t.Parallel()
+
+			tr := parseRBTFromTests(before)
+			leftRotate(tr, findNode(tr, tc.x))
+			if got := formatRBTForTests(tr); got != after {
+				t.Fatalf("left rotate did not produce the expected tree:\ngot:\n%s\nwant:\n%s", got, after)
+			}
+		})
+
+		t.Run(fmt.Sprintf("y=%d/right rotate", tc.y), func(t *testing.T) {
+			t.Parallel()
+
+			tr := parseRBTFromTests(after)
+			rightRotate(tr, findNode(tr, tc.y))
+			if got := formatRBTForTests(tr); got != before {
+				t.Fatalf("right rotate did not produce the expected tree:\ngot:\n%s\nwant:\n%s", got, before)
+			}
+		})
+	})
+}
+
+// TestRotate showcases how rotations work.
+//
+// Note that rotations do not change the tree colors, therefore resulting trees
+// may violate the RBT properties. These are not checked in the rotation tests
+// since it is the responsibility of the insertion algorithm to enfore them.
+// Colors have been included to also show that rotations do not change colors.
+func TestRotate(t *testing.T) {
+	t.Parallel()
+
+	cases := []testcase{
+		{
+			name: "x is the root and has only a right child",
+			x:    1,
+			y:    2,
+			leftRotateXresult: `
+   2[R]
+   /
+ 1[B]`,
+			rightRotateYresult: `
+1[B]
+  \
+  2[R]`,
+		},
+		{
+			name: "x is the root and has both children",
+			x:    2,
+			y:    4,
+
+			leftRotateXresult: `
+      4[B]
+    v--+--v
+   2[B]  5[R]
+ v--+--v
+1[B]  3[R]`,
+			rightRotateYresult: `
+   2[B]
+ v--+--v
+1[B]  4[B]
+    v--+--v
+   3[R]  5[R]`,
+		},
+		{
+			name: "x is the left child of its parent and has only a right child",
+			x:    2,
+			y:    3,
+
+			leftRotateXresult: `
+      5[B]
+    v--+--v
+   3[B]  8[B]
+   /
+ 2[R]`,
+			rightRotateYresult: `
+   5[B]
+ v--+--v
+2[R]  8[B]
+  \
+  3[B]`,
+		},
+		{
+			name: "x is the right child of its parent and has only a right child",
+			x:    8,
+			y:    9,
+
+			leftRotateXresult: `
+   5[B]
+ v--+--v
+2[B]  9[B]
+      /
+    8[R]`,
+			rightRotateYresult: `
+   5[B]
+ v--+--v
+2[B]  8[R]
+        \
+        9[B]`,
+		},
+		{
+			name: "x is the left child of its parent and has both children",
+			x:    5,
+			y:    7,
+
+			leftRotateXresult: `
+         10[B]
+       v---+---v
+      7[B]   15[B]
+      /
+    5[R]
+    /
+  3[B]`,
+			rightRotateYresult: `
+      10[B]
+    v---+---v
+   5[R]   15[B]
+ v--+--v
+3[B]  7[B]`,
+		},
+		{
+			name: "x is the right child of its parent and has both children",
+			x:    15,
+			y:    17,
+
+			leftRotateXresult: `
+    10[B]
+ v----+----v
+1[B]     17[B]
+          /
+       15[R]
+        /
+     13[B]`,
+			rightRotateYresult: `
+   10[B]
+ v---+---v
+1[B]   15[R]
+     v---+---v
+   13[B]   17[B]`,
+		},
+	}
+
+	for _, tc := range cases {
+		runtc(t, tc)
+	}
+}
+
+func equalTrees(a, b *RBT[int]) bool {
+	var walk func(x, y *RBTNode[int]) bool
+	walk = func(x, y *RBTNode[int]) bool {
+		if x == nil || y == nil {
+			return x == nil && y == nil
+		}
+		if x.Value() != y.Value() || x.color != y.color {
+			return false
+		}
+		return walk(x.Left(), y.Left()) && walk(x.Right(), y.Right())
+	}
+	return walk(a.Root(), b.Root())
+}
+
 type coloredValue struct {
 	value int
 	color string
@@ -183,6 +323,8 @@ func bfsColoredValues(root *RBTNode[int]) []coloredValue {
 }
 
 func bstInsertNode(tr *RBT[int], value int, color string) {
+	tr.lazyInit()
+
 	if tr.root == tr.tnil {
 		tr.root = &RBTNode[int]{
 			parent: tr.tnil,
