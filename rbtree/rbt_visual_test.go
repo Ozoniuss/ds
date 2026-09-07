@@ -43,8 +43,8 @@ func parseRBTFromTests(repr string) *RBT[int] {
 	// we actually don't care at all about edges, since inserting in BFS order
 	// on a regular tree
 	for i := 0; i < len(parts); i += 2 {
-		numstrs := strings.Fields(parts[i])
-		for _, n := range numstrs {
+		numstrs := strings.FieldsSeq(parts[i])
+		for n := range numstrs {
 			num, err := strconv.Atoi(n[:len(n)-3])
 			if err != nil {
 				msg := "parseRBTFromTests: parsing number " + n
