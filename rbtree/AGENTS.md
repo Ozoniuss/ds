@@ -14,12 +14,30 @@ to it.
 - Fields holding a drawing should be named after the operation and node
   that produce it, not generic names like `before`/`after`.
 
+## What visual tests cover
+
+- Visual tests demonstrate what an operation does to the shape and colors of a
+  tree. They are not for testing panics or other error paths: every case must
+  start from a valid tree and exercise the operation on valid inputs. Guard
+  clauses (nil checks, sentinel-destination checks, and similar) belong in other
+  tests.
+- The tree an operation produces does not have to be a valid BST or red-black
+  tree. Low-level helpers such as rotations and transplant may leave the tree
+  invalid, which is fine since constraint validation is tested elsewhere.
+
 ## Drawings
 
 - Every drawing must make the operation and the node(s) involved
   unambiguous. Identify the relevant nodes through the case's own fields,
   and make sure each before/after pair actually demonstrates the operation
   rather than restating the same shape.
+- Each case includes its own input tree as a field, even when several cases
+  use the same input. Don't move it out to one shared value: the case should
+  be readable on its own, without having to look somewhere else to see what
+  the operation started from.
+- Every drawing starts on a new line (a newline right after the opening
+  backtick) so the first line lines up with the rest. Remove that leading
+  newline before using the string.
 - Never hand-type a drawing. Generate it from the real formatter: build the
   nodes in a throwaway test in this package, run it, capture the exact
   output, then delete the throwaway code before finishing. Hand-picked

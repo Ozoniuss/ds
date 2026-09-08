@@ -99,64 +99,6 @@ func TestBFSReinsertionReproducesTree(t *testing.T) {
 	}
 }
 
-type testcase struct {
-	name string
-
-	x int
-	y int
-
-	leftRotateXresult  string
-	rightRotateYresult string
-}
-
-func findNode(tr *RBT[int], value int) *RBTNode[int] {
-	n := tr.root
-	for n != tr.tnil {
-		if value < n.value {
-			n = n.left
-		} else if value > n.value {
-			n = n.right
-		} else {
-			return n
-		}
-	}
-	panic(fmt.Sprintf("findNode: value %d not found in tree", value))
-}
-
-func runtc(t *testing.T, tc testcase) {
-	t.Helper()
-
-	t.Run(tc.name, func(t *testing.T) {
-		t.Parallel()
-
-		before := strings.TrimPrefix(tc.rightRotateYresult, "\n")
-		after := strings.TrimPrefix(tc.leftRotateXresult, "\n")
-
-		// Note that we can test both given leftRotate and rightRotate are each
-		// other's inverse function.
-
-		t.Run(fmt.Sprintf("x=%d/left rotate", tc.x), func(t *testing.T) {
-			t.Parallel()
-
-			tr := parseRBTFromTests(before)
-			leftRotate(tr, findNode(tr, tc.x))
-			if got := formatRBTForTests(tr); got != after {
-				t.Fatalf("left rotate did not produce the expected tree:\ngot:\n%s\nwant:\n%s", got, after)
-			}
-		})
-
-		t.Run(fmt.Sprintf("y=%d/right rotate", tc.y), func(t *testing.T) {
-			t.Parallel()
-
-			tr := parseRBTFromTests(after)
-			rightRotate(tr, findNode(tr, tc.y))
-			if got := formatRBTForTests(tr); got != before {
-				t.Fatalf("right rotate did not produce the expected tree:\ngot:\n%s\nwant:\n%s", got, before)
-			}
-		})
-	})
-}
-
 // TestRotate showcases how rotations work.
 //
 // Note that rotations do not change the tree colors, therefore resulting trees
@@ -165,6 +107,16 @@ func runtc(t *testing.T, tc testcase) {
 // Colors have been included to also show that rotations do not change colors.
 func TestRotate(t *testing.T) {
 	t.Parallel()
+
+	type testcase struct {
+		name string
+
+		x int
+		y int
+
+		leftRotateXresult  string
+		rightRotateYresult string
+	}
 
 	cases := []testcase{
 		{
@@ -277,8 +229,173 @@ func TestRotate(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		runtc(t, tc)
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			before := strings.TrimPrefix(tc.rightRotateYresult, "\n")
+			after := strings.TrimPrefix(tc.leftRotateXresult, "\n")
+
+			// Note that we can test both given leftRotate and rightRotate are each
+			// other's inverse function.
+
+			t.Run(fmt.Sprintf("x=%d/left rotate", tc.x), func(t *testing.T) {
+				t.Parallel()
+
+				tr := parseRBTFromTests(before)
+				leftRotate(tr, findNode(tr, tc.x))
+				if got := formatRBTForTests(tr); got != after {
+					t.Fatalf("left rotate did not produce the expected tree:\ngot:\n%s\nwant:\n%s", got, after)
+				}
+			})
+
+			t.Run(fmt.Sprintf("y=%d/right rotate", tc.y), func(t *testing.T) {
+				t.Parallel()
+
+				tr := parseRBTFromTests(after)
+				rightRotate(tr, findNode(tr, tc.y))
+				if got := formatRBTForTests(tr); got != before {
+					t.Fatalf("right rotate did not produce the expected tree:\ngot:\n%s\nwant:\n%s", got, before)
+				}
+			})
+		})
 	}
+}
+
+// TestTransplant showcases how rbtransplant works.
+//
+// Note that transplant only rewires the parent's child pointer (or the tree
+// root) to v and sets v's parent; u itself is left untouched. It does not
+// preserve the BST or RBT properties, so resulting trees may be invalid. Colors
+// have been included to show that transplant does not change them.
+func TestTransplant(t *testing.T) {
+	t.Parallel()
+
+	type testcase struct {
+		name string
+
+		u int
+		v int
+		// v is the tnil sentinel and the v field is ignored
+		vSentinel bool
+
+		tree             string
+		transplantResult string
+	}
+
+	cases := []testcase{
+		{
+			name: "u is the root and v is an internal subtree",
+			u:    20,
+			v:    10,
+			tree: `
+       20[B]
+     v---+---v
+   10[B]   30[B]
+ v---+---v
+5[R]   15[R]`,
+			transplantResult: `
+   10[B]
+ v---+---v
+5[R]   15[R]`,
+		},
+		{
+			name: "u is the left child of its parent and v is an internal subtree",
+			u:    10,
+			v:    15,
+			tree: `
+       20[B]
+     v---+---v
+   10[B]   30[B]
+ v---+---v
+5[R]   15[R]`,
+			transplantResult: `
+    20[B]
+  v---+---v
+15[R]   30[B]`,
+		},
+		{
+			name: "u is the right child of its parent and v is an internal subtree",
+			u:    30,
+			v:    5,
+			tree: `
+       20[B]
+     v---+---v
+   10[B]   30[B]
+ v---+---v
+5[R]   15[R]`,
+			transplantResult: `
+      20[B]
+     v--+--v
+   10[B]  5[R]
+ v---+---v
+5[R]   15[R]`,
+		},
+		{
+			name:      "u is the left child of its parent and v is a sentinel",
+			u:         10,
+			vSentinel: true,
+			tree: `
+       20[B]
+     v---+---v
+   10[B]   30[B]
+ v---+---v
+5[R]   15[R]`,
+			transplantResult: `
+20[B]
+   \
+  30[B]`,
+		},
+		{
+			name:      "u is the right child of its parent and v is a sentinel",
+			u:         30,
+			vSentinel: true,
+			tree: `
+       20[B]
+     v---+---v
+   10[B]   30[B]
+ v---+---v
+5[R]   15[R]`,
+			transplantResult: `
+       20[B]
+        /
+     10[B]
+   v---+---v
+  5[R]   15[R]`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			want := strings.TrimPrefix(tc.transplantResult, "\n")
+
+			tr := parseRBTFromTests(strings.TrimPrefix(tc.tree, "\n"))
+			v := tr.tnil
+			if !tc.vSentinel {
+				v = findNode(tr, tc.v)
+			}
+			rbtransplant(tr, findNode(tr, tc.u), v)
+
+			if got := formatRBTForTests(tr); got != want {
+				t.Fatalf("transplant did not produce the expected tree:\ngot:\n%s\nwant:\n%s", got, want)
+			}
+		})
+	}
+}
+
+func findNode(tr *RBT[int], value int) *RBTNode[int] {
+	n := tr.root
+	for n != tr.tnil {
+		if value < n.value {
+			n = n.left
+		} else if value > n.value {
+			n = n.right
+		} else {
+			return n
+		}
+	}
+	panic(fmt.Sprintf("findNode: value %d not found in tree", value))
 }
 
 func equalTrees(a, b *RBT[int]) bool {
