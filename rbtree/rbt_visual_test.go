@@ -384,6 +384,271 @@ func TestTransplant(t *testing.T) {
 	}
 }
 
+// TestInsert showcases what Insert does to the shape and colors of a tree,
+// including the recoloring and rebalancing performed by insertFixup.
+func TestInsert(t *testing.T) {
+	t.Parallel()
+
+	type testcase struct {
+		name string
+
+		value int
+
+		tree         string
+		beforeFixup  string
+		insertResult string
+	}
+
+	cases := []testcase{
+		{
+			name:  "the tree is empty, so the value becomes the black root",
+			value: 10,
+			tree:  "",
+			insertResult: `
+10[B]`,
+		},
+		{
+			name: `the value's parent and uncle are red, so the fixup recolors
+			(this is actually the case where root also gets recolored which may
+			make this test a bit confusing)`,
+			value: 3,
+			tree: `
+   10[B]
+ v---+---v
+5[R]   15[R]`,
+			beforeFixup: `
+      10[B]
+    v---+---v
+   5[R]   15[R]
+   /
+ 3[R]`,
+			insertResult: `
+      10[B]
+    v---+---v
+   5[B]   15[B]
+   /
+ 3[R]`,
+		},
+		{
+			name: `the value's parent and uncle are red below a black grandparent,
+			so the fixup only recolors`,
+			value: 5,
+			tree: `
+        50[B]
+      v---+---v
+    20[B]   70[B]
+  v---+---v
+10[R]   30[R]`,
+			beforeFixup: `
+           50[B]
+         v---+---v
+       20[B]   70[B]
+     v---+---v
+   10[R]   30[R]
+    /
+  5[R]`,
+			insertResult: `
+           50[B]
+         v---+---v
+       20[R]   70[B]
+     v---+---v
+   10[B]   30[B]
+    /
+  5[R]`,
+		},
+		{
+			name: `the value's uncle is the sentinel, so the fixup recolors and
+			rotates right around the grandparent`,
+			value: 3,
+			tree: `
+   10[B]
+    /
+  5[R]`,
+			beforeFixup: `
+      10[B]
+       /
+     5[R]
+     /
+   3[R]`,
+			insertResult: `
+    5[B]
+ v---+---v
+3[R]   10[R]`,
+		},
+		{
+			name: `the value's parent is black, so the fixup leaves the tree
+			untouched`,
+			value: 7,
+			tree: `
+   10[B]
+ v---+---v
+5[B]   15[B]`,
+			beforeFixup: `
+   10[B]
+ v---+---v
+5[B]   15[B]
+  \
+  7[R]`,
+			insertResult: `
+   10[B]
+ v---+---v
+5[B]   15[B]
+  \
+  7[R]`,
+		},
+		{
+			name: `the value is the inner child of a red parent, so the fixup
+			rotates left around the parent before rotating right around the
+			grandparent`,
+			value: 7,
+			tree: `
+   10[B]
+    /
+  5[R]`,
+			beforeFixup: `
+   10[B]
+    /
+  5[R]
+    \
+    7[R]`,
+			insertResult: `
+    7[B]
+ v---+---v
+5[R]   10[R]`,
+		},
+		{
+			name: `the value's parent and uncle are red and the parent is a right
+			child, so the fixup recolors`,
+			value: 20,
+			tree: `
+   10[B]
+ v---+---v
+5[R]   15[R]`,
+			beforeFixup: `
+   10[B]
+ v---+---v
+5[R]   15[R]
+          \
+         20[R]`,
+			insertResult: `
+   10[B]
+ v---+---v
+5[B]   15[B]
+          \
+         20[R]`,
+		},
+		{
+			name: `the value's uncle is the sentinel and the parent is a right
+			child, so the fixup recolors and rotates left around the grandparent`,
+			value: 20,
+			tree: `
+10[B]
+   \
+  15[R]`,
+			beforeFixup: `
+10[B]
+   \
+  15[R]
+     \
+    20[R]`,
+			insertResult: `
+    15[B]
+  v---+---v
+10[R]   20[R]`,
+		},
+		{
+			name: `the value is the inner child of a red right child, so the fixup
+			rotates right around the parent before rotating left around the
+			grandparent`,
+			value: 12,
+			tree: `
+10[B]
+   \
+  15[R]`,
+			beforeFixup: `
+  10[B]
+     \
+    15[R]
+     /
+  12[R]`,
+			insertResult: `
+    12[B]
+  v---+---v
+10[R]   15[R]`,
+		},
+		{
+			name: `the recoloring moves the violation up to a red parent whose own
+			uncle is black, so the fixup loops and then rotates`,
+			value: 5,
+			tree: `
+            50[B]
+          v---+---v
+        25[R]   75[B]
+      v---+---v
+    15[B]   35[B]
+  v---+---v
+10[R]   20[R]`,
+			beforeFixup: `
+               50[B]
+             v---+---v
+           25[R]   75[B]
+         v---+---v
+       15[B]   35[B]
+     v---+---v
+   10[R]   20[R]
+    /
+  5[R]`,
+			insertResult: `
+               25[B]
+         v-------+-------v
+       15[R]           50[R]
+     v---+---v       v---+---v
+   10[B]   20[B]   35[B]   75[B]
+    /
+  5[R]`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			want := strings.TrimPrefix(tc.insertResult, "\n")
+
+			t.Run("insert", func(t *testing.T) {
+				t.Parallel()
+
+				var tr *RBT[int]
+				if tc.tree == "" {
+					tr = &RBT[int]{}
+				} else {
+					tr = parseRBTFromTests(strings.TrimPrefix(tc.tree, "\n"))
+				}
+				tr.Insert(tc.value)
+
+				if got := formatRBTForTests(tr); got != want {
+					t.Fatalf("insert did not produce the expected tree:\ngot:\n%s\nwant:\n%s", got, want)
+				}
+			})
+
+			if tc.beforeFixup == "" {
+				return
+			}
+
+			t.Run("fixup", func(t *testing.T) {
+				t.Parallel()
+
+				tr := parseRBTFromTests(strings.TrimPrefix(tc.beforeFixup, "\n"))
+				insertFixup(tr, findNode(tr, tc.value))
+
+				if got := formatRBTForTests(tr); got != want {
+					t.Fatalf("fixup did not produce the expected tree:\ngot:\n%s\nwant:\n%s", got, want)
+				}
+			})
+		})
+	}
+}
+
 func findNode(tr *RBT[int], value int) *RBTNode[int] {
 	n := tr.root
 	for n != tr.tnil {
