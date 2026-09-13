@@ -54,7 +54,7 @@ Throughout this article, "internal node" will mean any node that is part of the 
 I also won't really go much into what these properties mean. TLDR, they allow tree operations to happen in logarithmic time when satisfied. The only thing important to understand here is that they must hold after every tree operation, which gives us a set of constraints. Unlike explicitly testing that some operations produced a particular tree, constraints give us something much more flexible: regardless of the input and the sequence of operations, the constraints must always hold. Therefore, we can shift our testing strategy to something like, let's randomly generate a bunch of trees and operations and after every operation we can test that the red-black properties still hold.
 
 
-
+    
 - another appraoch here is actually reading a tree from a predictable formatting method.
 
 On top of that, a tree has many valid representations. but given the library code is deterministic, the same sequence of operations would always result in the same tree.

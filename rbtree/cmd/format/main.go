@@ -12,10 +12,13 @@ var ttyRed = "\033[31m"
 func main() {
 
 	t1 := rbtree.NewRBT[int]()
-	t1.Insert(1)
-	t1.Insert(3)
-	t1.Insert(4)
 	t1.Insert(2)
+	t1.Insert(6)
+	t1.Insert(13)
+	t1.Insert(1)
+	t1.Insert(4)
+	t1.Insert(19)
+	// t1.Insert(2)
 
 	t4 := rbtree.NewRBT[int]()
 
