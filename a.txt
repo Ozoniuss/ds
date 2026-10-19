@@ -1,0 +1,88 @@
+     static void
+      _S_insert_and_rebalance(const bool __insert_left,
+			      _Base_ptr __x, _Base_ptr __p,
+			      _Node_base& __header)
+      {
+	_Base_ptr& __root = __header._M_parent;
+
+	// Initialize fields in new node to insert.
+	__x->_M_parent = __p;
+	__x->_M_left = __x->_M_right = nullptr;
+	__x->_M_color = _S_red;
+
+	// Insert.
+	// Make new node child of parent and maintain root, leftmost and
+	// rightmost nodes.
+	// N.B. First node is always inserted left.
+	if (__insert_left)
+	  {
+	    __p->_M_left = __x; // also makes leftmost = __x when __p == &__header
+
+	    if (std::__to_address(__p) == std::addressof(__header))
+	      {
+		__header._M_parent = __x;
+		__header._M_right = __x;
+	      }
+	    else if (__p == __header._M_left)
+	      __header._M_left = __x; // maintain leftmost pointing to min node
+	  }
+	else
+	  {
+	    __p->_M_right = __x;
+
+	    if (__p == __header._M_right)
+	      __header._M_right = __x; // maintain rightmost pointing to max node
+	  }
+	// Rebalance.
+	while (__x != __root
+	       && __x->_M_parent->_M_color == _S_red)
+	  {
+	    const _Base_ptr __xpp = __x->_M_parent->_M_parent;
+
+	    if (__x->_M_parent == __xpp->_M_left)
+	      {
+		const _Base_ptr __y = __xpp->_M_right;
+		if (__y && __y->_M_color == _S_red)
+		  {
+		    __x->_M_parent->_M_color = _S_black;
+		    __y->_M_color = _S_black;
+		    __xpp->_M_color = _S_red;
+		    __x = __xpp;
+		  }
+		else
+		  {
+		    if (__x == __x->_M_parent->_M_right)
+		      {
+			__x = __x->_M_parent;
+			_Rotate_left(__x, __root);
+		      }
+		    __x->_M_parent->_M_color = _S_black;
+		    __xpp->_M_color = _S_red;
+		    _Rotate_right(__xpp, __root);
+		  }
+	      }
+	    else
+	      {
+		const _Base_ptr __y = __xpp->_M_left;
+		if (__y && __y->_M_color == _S_red)
+		  {
+		    __x->_M_parent->_M_color = _S_black;
+		    __y->_M_color = _S_black;
+		    __xpp->_M_color = _S_red;
+		    __x = __xpp;
+		  }
+		else
+		  {
+		    if (__x == __x->_M_parent->_M_left)
+		      {
+			__x = __x->_M_parent;
+			_Rotate_right(__x, __root);
+		      }
+		    __x->_M_parent->_M_color = _S_black;
+		    __xpp->_M_color = _S_red;
+		    _Rotate_left(__xpp, __root);
+		  }
+	      }
+	  }
+	__root->_M_color = _S_black;
+      }
