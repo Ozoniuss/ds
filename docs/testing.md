@@ -1,64 +1,159 @@
-# How to test a data structure
+# Constraint-based testing
 
-I think by far one of the most important parts of implementing `rbtree` was having a proper way to test the implementation. This is not only for making sure that future changes are not breaking my library, but also to make sure the implementation is correct in the first place. The reason for choosing a red-black tree over a regular binary search tree in the first place is so that you benefit of the logarithmic complexity of the operations achieved by rebalancing the tree during writes. Therefore, you need some way to test that your tree is indeed balanced.
+> Before you read this, I want to emphasize that this article isn't about the theory behind Red-Black trees. No need to leave if that scares you;)
 
-However, this is not really as straightforward as simply giving it a sequence of inserts and deletes and comparing the result with an expected tree. That may be easier with some other data strucutures because the result is more predictable (e.g. with sorted sets, it's very easy to  visualize how the result should look like, and checking that is' actually sorted is straightforward). Visualizing the end result of a binary search tree is really hard because the rebalancing part performed during inserts and deletions is a bit like black magic. In fact, even for a regular binary search trees it is not immediately obvious during a deletion how the tree will end up looking like.
+For a while I've been working on a Red-Black tree library, and I kind of wanted to talk about my journey of coming up with a test suite for it. I found this part interesting, challenging and quite annoying all at the same time, as it got me stuck in so many trains of thought wondering if I have the right approach. Of all things, when you're implementing an efficient data structure module, arguably what you care about most is correctness. I mean, ergonomics and performance don't really mean much when the code is not working as expected. In fact, most of my effort so far went into the testing suite, since the algorithms are a [textbook](https://www.cs.mcgill.ca/~akroit/math/compsci/Cormen%20Introduction%20to%20Algorithms.pdf) rip-off (though you can find them pretty much everywhere online).
 
-On top of this, how do you actually perform the comparison? Specifying the result of a sorted list is as simple as writing the elements in a regular array and calling `sort` at the end, but you don't really have a simple way of actually writing the resulting tree you're expecting in a test, because you need to manually write all the node connections yourself. Practically, this is unfeasible with large trees (at least, it is for me with the limited time I have to develop this). Even thinking about all possible scenarios you have during an insert or deletion operation is kind of difficult simply because there's so many cases to consider. Plus, you will always ask yourself the question, "have I covered all cases?" (although this is greatly mitigated by knowing that these structures have been studied for years).
+When you want correctness, it means you want to write _a lot_ of tests. And that came with problems.
 
-This is where constraints come in.
+## Writing down a tree
 
+Let's start with how you'd typically use a binary tree. I'd say most cases are summarized by:
 
-Let's talk about what it means for a binary search tree to actually satisfy the red black tree properties. But first we need to understand the binary search tree properties:
+```go
+
+func main() {
+
+	// define a tree
+	t := rbtree.NewRBT[int]()
+
+	// get values from somewhere
+	t.Insert(2)
+	t.Insert(6)
+	t.Insert(13)
+	t.Insert(1)
+	t.Insert(4)
+	t.Insert(19)
+
+	// work with the tree, i.e. go through nodes
+	explore(t.Root())
+
+	// maybe more writes, more work
+}
+```
+
+Well, at least kinda. This is obviously oversimplified and your code most likely never looked like this. What I wanted to show here is the lifecycle of the object. 
+
+However, there's actually a good chance you used a tree-like data structure in your code, just not directly. In "real world" use cases, they're a common tool powering other abstractions. The [std::map](https://en.cppreference.com/cpp/container/map) and [std::set](https://en.cppreference.com/cpp/container/set) C++ containers are implemented as Red-Black trees and I would argue we have lots of production code out there with sets and maps. Those have a different API, but the operations happening behind these abstractions use a "tree-like" API. Have a look at C++'s [std::set](https://github.com/gcc-mirror/gcc/blob/b1263bca56ea82e555ddccf6729042a25805580c/libstdc%2B%2B-v3/include/bits/stl_set.h) implementation, which uses this [Red-Black tree](https://github.com/gcc-mirror/gcc/blob/b1263bca56ea82e555ddccf6729042a25805580c/libstdc%2B%2B-v3/include/bits/stl_set.h#L137) to see for yourself. Of course, that's assuming you can even read that shit. I kept looking at the set file for a while and wondering, "where's the fucking set, though?"
+
+> To be "that guy", it's actually `gcc`'s implementation and it's actually [this](https://github.com/gcc-mirror/gcc/blob/b1263bca56ea82e555ddccf6729042a25805580c/libstdc%2B%2B-v3/include/bits/stl_tree.h) Red-Black tree. Here's its [insertion code](https://github.com/gcc-mirror/gcc/blob/b1263bca56ea82e555ddccf6729042a25805580c/libstdc%2B%2B-v3/include/bits/stl_tree.h#L764). That's a total of 307 __underscores!
+
+As a side note, I personally have use cases where I use trees directly, which is when I do coding problems and [trees](https://github.com/Ozoniuss/Algorithms/commit/5d8d7f809c220913afab2c51a5feb266cd53e2ad) happen to show up. Then my code can end up looking similar to the snippet, with most effort going into the "work with the tree, i.e. go through nodes" part. Yeah, I find a lot of joy in figuring out if I want to go left or right. What I don't find a lot of joy in (at least with leetcode problems) is the "get values from somewhere" part. Getting those values from their inputs to test my stuff locally can be at least as complicated as writing the actual solution to the problem.
+
+Most of the time, your input looks something like this:
+
+![alt text](image-3.png)
+
+Here, I took one input from [problem 2265](https://leetcode.com/problems/count-nodes-equal-to-average-of-subtree/). This is perfectly fine, as long as you represent it with an image. That's not the case in your source code, though. Instead, it ends up looking something like this:
+
+```go
+func() Tree[int] {
+	root := &BSTNode[int]{value: 4}
+	l := &BSTNode[int]{value: 8, parent: root}
+	r := &BSTNode[int]{value: 5, parent: root}
+	ll := &BSTNode[int]{value: 0, parent: l}
+	lr := &BSTNode[int]{value: 1, parent: l}
+	rr := &BSTNode[int]{value: 6, parent: r}
+	root.left = l
+	root.right = r
+	l.left = ll
+	l.right = lr
+	r.right = rr
+	return &BST[int]{root: root, size: 6}
+}()
+```
+
+This is only 6 nodes, by the way.
+
+I think at this point you're starting to see the direction I'm going in. Even for relatively small trees, this representation totally lacks clarity. Sure, I can see arguments coming from a mile away that this isn't painful anymore now with AI, but still, there's no way you can give that snippet to someone and have them understand what the tree looks like. You can imagine why for tests, it becomes quite a significant downside. Or, you could of course argue that reading code (particularly tests) isn't a problem anymore either. Whatever floats your boat.
+
+Admittedly, there are ways to simplify writing these inputs. One example is writing it as a list, which is how LeetCode does it:
 
 ```
-    1
-   / \
-  2   13
- / \   \
-4   6   19
+root = [4,8,5,0,1,null,6]
 ```
 
-Above we have a tree data structure, but it's not actually a binary search tree. However, the one below, is:
+> To give them some credit, you can now edit the inputs and see the tree with a visualizer:
 
-```
-    6
-   / \
-  2   13
- / \   \
-1   4   19
+![alt text](image-5.png)
+
+This representation is much more compact, but it still has the same downside of lacking clarity. I was actually surprised the first time I saw how `[4,null,5,null,6]` looks: 
+
+![alt text](image-6.png)
+
+Another is what I did in the beginning: create the tree with a sequence of inserts. That's essentially the same as the representation above, since that list is a sequence of inserts. LeetCode has `null` elements because some of their test inputs aren't valid binary search trees, like the first image.
+
+I suppose eventually, you'd get used to whatever representation you use most commonly. But there's no denying that images are simply a much, much better representation of a binary tree input. I actually ended up [writing a renderer](https://github.com/Ozoniuss/ds/blob/8ca58b28055dfc3b02b78dea8a271187d7cab0f8/rbtree/format.go#L73) just so I can see tree drawings in my source code! Here's a snippet from my [test suite](https://github.com/Ozoniuss/ds/blob/8ca58b28055dfc3b02b78dea8a271187d7cab0f8/rbtree/rbt_visual_test.go):
+
+>  Here I'm testing transplant(u, v) which overwrites node u with node v, using table-driven testing. Note that transplant can leave the tree in an invalid state. 
+
+```go
+func TestTransplant(t *testing.T) {
+
+	type testcase struct {
+		// testcase definition
+	}
+
+	cases := []testcase{
+		// ...
+		{
+			name: "u is the right child of its parent and v is an internal subtree",
+			u:    30,
+			v:    5,
+			initialTree: `
+       20[B]
+     v---+---v
+   10[B]   30[B]
+ v---+---v
+5[R]   15[R]`,
+			transplantResult: `
+      20[B]
+     v--+--v
+   10[B]  5[R]
+ v---+---v
+5[R]   15[R]`,
+		},
+		// ...	
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// check initial tree looks as expected after transplant
+		})
+	}
+}
 ```
 
-For a tree to satisfy the binary-search-tree property, all left children to the root of any subtree must have a value smaller than the root, and all right children a greater value. Note that this is a recursive property, so the following also doesn't satisfy the binary-search-tree property due to the subtree rooted at 19:
+I'll be covering how it works in a future article, since it was tricky to get right. I find this a significant step up in terms of clarity but still, wasn't good enough for me to be satisfied with proving correctness. On top of it, you actually need to, well, write these inputs:) No wonder AI generates all your test cases now. When you start to think a bit more about it, I'm basically paying a bunch of big-ass corporate monopolies to write test cases for my open source library. I prefer not to think about it.
 
 ## Testing for correctness
 
 Let's dive into correctness a bit more. So far, I kind of implied that your testing approach looks something like this:
 
 - Start with a set of inputs;
-- Apply the operation on that set of inputs;
-- Evaluate the result of the operation against an expected result.
+- Apply the operation on each of those inputs;
+- Evaluate the result of each operation against an expected result.
 
-This is very basic but also a good description of how most unit test cases are set up. Let's be honest, you probably just want to pass that coverage requirement, don't you? While I find it suitable for reasonably simple logic, it becomes tricky for Red-Black tree operations. To put it into perspective, here's how the insert implementation [looks like](https://en.wikipedia.org/wiki/Red%E2%80%93black_tree#Insertion). The book that I've been reading dedicates 6 pages just to explain the rebalancing procedure you may or may not need to execute at the end of the insertion. Here's a snippet. ![alt text](image-4.png)
+This is very basic but also a great description of how most unit test cases are set up. Let's be honest, you probably just want to pass that coverage requirement, don't you? While I find it suitable for reasonably simple logic, it becomes tricky for Red-Black tree operations. To put it into perspective, here's what the insert implementation [looks like](https://en.wikipedia.org/wiki/Red%E2%80%93black_tree#Insertion). This is without the underscores! The book that I've been reading dedicates 6 pages just to explain the rebalancing procedure you may or may not need to execute at the end of the insertion. Here's a snippet. ![alt text](image-4.png)
 
-Sure, having to read through this isn't the worst thing in the world (remember those C++ snippets from earlier?). Nonetheless, it's complex enough to wrap your head around and inevitably doesn't give me enough confidence that I have a sufficient number of test cases to cover all branches. In theory, those are finite (textbook classifies it in 3 cases) but not in the sense that each test input will pass through one of these 3 cases. Rather, the intermediary state during an insertion can be one of these 3 cases. Rebalancing is done in a loop, so there are insertion operations that can fall through all cases, some multiple times. Even if you re-write the code so that you can individually test every rebalancing case, it still leaves the open question of what inputs are suitable for complete insertion tests.
+Sure, having to read through this isn't the worst thing in the world (remember those C++ snippets from earlier?). Nonetheless, it's complex enough to wrap your head around and inevitably doesn't give me enough confidence that I have a sufficient number of test cases to cover all branches (pun unintended). In theory, those are finite (textbook describes 3 cases) but not in the sense that each test input will pass through one of these 3 cases. Rather, the intermediary state during an insertion can be one of these 3 cases. Rebalancing is done in a loop, so there are insertion operations that can fall through all cases, some multiple times. Even if you re-write the code so that you can individually test every rebalancing case, it still leaves the open question of what inputs are suitable for complete insertion tests.
 
-As if this weren't enough, there's some additional considerations which I won't cover in depth, but affect how you should design your test suite. You can read more at the end. But perhaps the one worth pointing out separately is that, while the implementation of the insertion operation is (or at least should definitely be) deterministic, there are multiple valid rebalancing implementations, some more efficient than others. The same input can produce different valid trees under different rebalancing algorithms, meaning that a test suite like this isn't portable.
+There are some additional considerations here [1,2], but perhaps the one worth pointing out separately is that, while the implementation of the insertion operation is (or at least should definitely be) deterministic, there are multiple valid rebalancing implementations, with different efficiency considerations. The same input can produce different valid Red-Black trees under different rebalancing algorithms, meaning that a test suite like this isn't portable.
 
-At this point, I suggest to start approaching tests differently. Let's take a step back to think about what being a Red-Black tree actually means. All you need to become one is satisfying a set of invariants (constraints):
+At this point, I suggest we take a step back and think about these tests from a different perspective. Let's briefly mention what a Red-Black tree actually is. All you need to become one is to satisfy a set of invariants (constraints):
 
 0. It must satisfy the binary search tree property
-1. The root is black
-2. Every node is colored either red or black
+1. Every node is colored either red or black.
+2. The root is black.
 3. Every leaf (TNIL) is black.
 4. If a node is red, then both its children are black
-5. For each node, all simple paths from the node to descendant leaves contain the same number of black nodes.
+5. For each node, all simple paths from the node to TNIL leaves contain the same number of black nodes.
 
 If that's you, congrats! You're a Red-Black tree now 🌞
 
-Like I said, I won't go into details about these properties. The important bit is the result they provide: _the tree is approximately balanced_. This effectively allows for implementations of write and read methods that run in logarithmic time with respect to the number of nodes in the tree. On a higher level, it offers a means to implement a collection of sorted elements efficiently.
+Like I promised, I won't go into details about Red-Black trees. The important bit is the result they provide: _the tree is approximately balanced_. This effectively allows for implementations of write and read methods that run in logarithmic time with respect to the number of nodes in the tree. On a higher level, it offers a means to implement a collection of sorted elements efficiently.
 
-The nice thing about constraints is that they must hold after every write on a Red-Black tree. This is a substantial benefit when designing a test suite, because _we no longer need to worry about explicit tree inputs and outputs_. [4] In the beginning, I showed how you generally use a tree:
+The nice thing about constraints is that they must hold after every write on a Red-Black tree. This is a substantial benefit when designing a test suite, because _we no longer care what the tree looks like_. [3] In the beginning, I showed how you generally use a tree:
 
 ```go
 func main() {
@@ -78,7 +173,7 @@ func main() {
 }
 ```
 
-Focusing on constraints enables us to define tests following a similar pattern. After every operation, we just assert that the resulting structure is a Red-Black tree, without having to visualize its shape. We could come up with a testing sequence that looks something like this:
+Focusing on constraints enables us to employ a similar pattern in our tests. After every operation, we just assert that the resulting structure is a Red-Black tree, without having to visualize its shape. We could come up with a testing sequence that looks something like this:
 
 - Generate a random list of (unique) elements;
 - Insert every element into the tree;
@@ -121,7 +216,7 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 			if n.color != _COLOR_BLACK {
 				t.Fatal("property 3 violation: sentinel node should be black")
 			}
-			// if we haven't explore any simple path to TNIL yet, set it as the
+			// if we haven't explored any simple path to TNIL yet, set it as the
 			// target to compare to. Otherwise, compare it against an existing
 			// target since the black node count must match.
 			if bnCountTarget == -1 {
@@ -158,48 +253,62 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 }
 ```
 
-And there you go! Knowing these constraints hold after every operation should give you a high degree of confidence that your implementation is correct.
+And also, one of my tests:
 
-Or, should it?...
+```go
+func TestRBTPropertiesDeterministicPermutations(t *testing.T) {
+	rng := rand.New(rand.NewPCG(6, 7))
 
-## The problem with constraints
+	for i := range 100 {
+		n := rng.IntN(1_000) + 1
+		values := rng.Perm(1_000)[:n]
 
-At first glance, I would say the approach above is quite convincing that my tree is correct. At least, I was convinced in the beginning. Though we are overlooking quite a few things if we just leave it like this.
+		t.Run(fmt.Sprintf("%03d/n=%d", i, n), func(t *testing.T) {
+			tr := NewRBT[int]()
+			cnt := 0
+			for _, v := range values {
+				tr.Insert(v)
+				cnt += 1
+				assertRBTProperties(t, tr)
+				if tr.Size() != cnt {
+					t.Fatalf("tree size is not %d after inserts: %d", cnt, tr.Size())
+				}
+			}
+			for _, v := range values {
+				tr.Delete(v)
+				cnt -= 1
+				assertRBTProperties(t, tr)
+				if tr.Size() != cnt {
+					t.Fatalf("tree size is not %d after deletes: %d", cnt, tr.Size())
+				}
+			}
+		})
+	}
+}
+```
 
-It's necessary to highlight the part where I say "allows for implementations". On their own, these constraints only define valid tree structures on an abstract level. Modelling that representation in code **does not automatically mean that your operations actually run efficiently!** To give an analogy, even if you have a list of sorted numbers, nothing stops you from searching one sequentially. This article will not cover performance tests more in depth, but you should definitely consider adding them to your test suite.
+And there you go! With randomized inputs, we're obviously able to cover a lot more ground than specifying test cases by hand. Knowing that every operation produces a valid Red-Black tree gives me a high degree of confidence that the implementation is correct. Or, at least it's doing a good job in making it easier to lie to myself. It was important to me to have coverage, but I found little research about what kind of distribution randomized tree inserts provide in Red-Black trees. Admittedly, I didn't put a lot of effort into researching this and just went YOLO with `go test -cover` [4]. Anyway, for me it was good enough to prove correctness.
 
-Therefore, testing constraints alone isn't a good enough proof of an efficient implementation. Still, we can leverage them to have a good enough proof of a correct implementation. 
+Or, was it?
 
+## The meaning of correctness
 
+At first glance, I would say the approach above is quite convincing that my tree is correct. At least, I was convinced in the beginning. Though we are overlooking a few things if we just leave it there.
 
-Focusing on constraints enables us to define tests following the same pattern. After every operation, we just assert that the resulting structure is a Red-Black tree, without having to visualize its shape. However, be mindful that testing constraints alone **isn't a substitution for testing the public API**, but rather a complement. To give a concrete example, here's how they could work together:
+Earlier, I said Red-Black trees allow for efficient implementations. I want to heavily stress the word "allow". On their own, constraints only define valid tree structures on an abstract level. Modelling that representation in code **does not automatically mean that your operations run efficiently!** To give an analogy, even if you have a list of sorted numbers, nothing stops you from searching through it sequentially. I will not discuss performance tests more in depth, but you should definitely consider adding them to your test suite.
 
-- Generate a random list of (unique) elements;
-- Insert every element that has an even position in the list;
-- Check the constraints hold after every insertion;
-- Assert that searching all elements with even positions in the input list returns a valid node, and those with odd positions return null.
+Well, that kinda sucks, but I can't really be bummed out about it since now I have a reason to write benchmarks, which is quite fun. But at least, my tree is correct, right? Turns out, the answer isn't quite that simple. I like to think there are different ways to view "correctness". Originally, the way I looked at it was being able to say "yeah this thing is fast!" In that regard, satisfying the Red-Black tree properties does give me plenty of confidence, especially with benchmarks in place.
 
-A good testing sequence will highly depend on the methods and parameters of your public interface, though. In my case, insertions don't return anything and reads return a node pointer [5], so the setup above makes sense. Consider appropriate adjustments based on your situation. If the tree accepted duplicates, have some duplicates in the input. If the insertion method returns output parameters, test them out. There's just so many ways to play around and explore with the design of your interface [6], so have some fun with it:)
+However, that's slightly different from proving that the internal representation of my data structure and the API I'm exposing behave correctly. The angle I use to approach this kind of correctness is through the lens of the question, "Can my program ever reach an invalid state?" There's a difference between the theoretical set of constraints aimed towards efficiency and the practical set of invariants your internal representation must hold at all times, even if they may overlap. [5] For example, my function above does not test that every node has a valid link to a parent, or that the count of internal nodes matches the number of unique elements inserted. And I do expose a `Parent()` method on the node and a `Size()` method on the tree, plus the write algorithms change quite a few links. It's definitely problematic when the internal representation no longer looks like you expect.
 
+There are various layers to it on the implementation side. Arguably, what you care about most is the public API. You could expose it as an interface and test via the interface alone, which allows you to swap internal implementations (for example, some tree implementations don't hold parent pointers). At the same time, I find it pretty important to also validate your specific internal representation. It has the downside of coupling the tests to your internal representation which requires changes to the test suite if you switch it, but in this case it would only require changes in my validation function. It's nowhere near as bad in terms of portability as having to potentially change an entire test suite's outputs, such as if you tested explicit trees and changed the rebalancing implementation. [6]
 
-Taking a step back to the Red-Black tree library tests. There is an efficient way to validate the 6 original constraints using a single tree traversal. This gives us a lot of flexibility in our tests, since we now can write tests on large randomized sets of inputs. Validating the public interface works as expected combined with the fact that the shape of the tree is correct gives me plenty of confidence in the testing suite.
+Honestly, to me it's a matter of taste. I think if you chase the "perfect" abstractions, you may end up writing C++ template code. So I just try to find an approach that gives me enough confidence but is also reasonably cheap to refactor. One of the hardest things I had to accept when switching from maths to engineering is that things weren't so black and white anymore (I guess the're black and red). To me engineering is all about making the right trade-offs, and in this particular case it means finding the right combination of validating the abstract constraints, the additional internal ones and the public API. I find it perfectly reasonable to combine all of them in your tests, so be creative and have some fun:)
 
-If you're interested, here is the algorithm to validate the constraints:
-
-(insert code)
-
-Also, this is the shape of the tests:
-
-(insert code)
-
-
-What I love about constraints is that you can use them to infer other constraints. For Red-Black trees, one particularly interesting one is that a subtree rooted at a node `x` contains at least `2^bh(x) - 1` internal nodes, where `bh` is the black height of the node. In turn, this implies that the height of any Red-Black tree is at most `2*lg(n+1)`, where `n` is the number of nodes. That gives you more possiblities when deciding which sets of constraints you might want to validate in your tests, because some may have more efficient algorithms to check or may simply be easier to write. Just be careful when testing a different set of constraints than the original ones, as **they must imply the original set of constraints**. Just satisfying the height property alone **does not** imply a tree is a Red-Black tree.
-
-> I like math a lot, so I like to think of the starting constraints as some axioms that define a space where you can play around and explore its properties. It's just amazing how many new things you can deduce starting from just a few statements that we label as true. Strictly speaking, there's more to it than just the starting 6 axioms. You could go even further and ask yourself, "What does a tree, a node or a child actually mean?" but here I find it important to be practical. As long as the underlying language used to define these "axions" is the same for everyone (e.g. it is clear what a child node means), then the constraints are a good starting point to explore.
 
 ## Additional considerations
 
-- Coming up with test cases and understanding what happened is still difficult, even with visual tests. Can you tell what happened in the test below?
+1. Coming up with valid test cases and understanding what happened is still difficult for Red-Black trees, even with visual tests. Can you easily tell if the input tree is valid and what the hell happened during the insertion?
 
 ```go
 		{
@@ -233,53 +342,20 @@ What I love about constraints is that you can use them to infer other constraint
     /
   5[R]`,
 		},
-	}
 ```
 
-- I'm not sure if every structurally valid Red-Black tree can be reproduced using a random sequence of insertions and deletions, at least with the algorithm that I'm using. One might argue an input like that does not constitute a valid test case, though personally I think it should.
+2. I'm not sure if every structurally valid Red-Black tree can be reproduced using a sequence of insertions and deletions, at least with the algorithm that I'm using. One might argue an "unreachable" input isn't a valuable test case, which I can understand, though personally I think it should be if the operation itself isn't different. The algorithm is designed based on the constraints alone, which are still satisfied. Still, it's something I worried about when writing inputs.
 
-- Constraints do prove the correctness of your internal representation. They don't necessarily prove the correctness of the methods you expose via your interface.
+3. We still care about inputs, particularly how we generate them. For example, if your Red-Black tree doesn't support duplicates, you have to decide if you want to avoid them (and simplify e.g. testing the size) or include them (and e.g. test insertion errors in the case your API returns one).
 
-- We still care about test inputs in general and how we generate them. And I still think you should have some tests on explicit inputs.
+4. `go test -cover` measures statement coverage. It tells you every line ran at least once, but not which combinations of rebalancing cases ran, or how many loop iterations. So it doesn't fully answer the question from earlier. In my case, both fixup functions are at 100%. The only lines the randomized test misses are inserting a duplicate and deleting a missing value (my inputs are unique), plus some panic guards.
 
-5 -  this is subject to change
+5. If you read [The Power of 10: Rules for Developing Safety-Critical Code](https://en.wikipedia.org/wiki/The_Power_of_10:_Rules_for_Developing_Safety-Critical_Code) you will find advice to actually test invariants at runtime. I won't do that in my implementation, but I do `panic` in some cases that I know would break the code.
 
-6 - you can decide between being more thorough in your tests, but they can never be fully correct. and it also obviously depends on how expensive it is to test the result. you want to be practical
-
-![alt text](<Screenshot From 2026-09-10 11-22-25.png>)
-![alt text](image.png)
-![alt text](image-1.png)
-
-		{
-			name: `the value's uncle is the sentinel, so the fixup recolors and
-			rotates right around the grandparent`,
-			value: 3,
-			tree: `
-   10[B]
-    /
-  5[R]`,
-			insertResult: `
-    5[B]
- v---+---v
-3[R]   10[R]`,
-
-good job fucking opus 5. I was writing them with sonnet and now I regret spending more quota.
-
-but to be honest I also read it wrong. ADHD meds hadn't kicked in yet.
-
-![alt text](image-2.png)
-
-agent's pretty bad at things for example it was always saying that left and right subtrees
-must have the same black height, which is untrue
+6. I still kept a reasonably small number of visual tests. That was mainly so I can better understand what is going on in the operations myself, but it also adds a slight (though not necessarily rational) increase in my confidence in my test suite. Plus, coding is pay to win these days anyway, so refactoring is "cheap".
 
 
 
+What I love about constraints is that you can use them to infer other constraints. For Red-Black trees, one particularly interesting one is that a subtree rooted at a node `x` contains at least `2^bh(x) - 1` internal nodes, where `bh` is the black height of the node. In turn, this implies that the height of any Red-Black tree is at most `2*lg(n+1)`, where `n` is the number of nodes. That gives you more possibilities when deciding which sets of constraints you might want to validate in your tests, because some may have more efficient algorithms to check or may simply be easier to write. Just be careful when testing a different set of constraints than the original ones, as **they must imply the original set of constraints**. Just satisfying the height property alone **does not** imply a tree is a Red-Black tree.
 
-
-
-----
-
-
-
-        https://github.com/golang/tools/blob/master/cover/profile.go
-        https://github.com/golang/tools/blob/master/cover/profile.go#L233
+> I like math a lot, so I like to think of the starting constraints as some axioms that define a space where you can play around and explore its properties. It's just amazing how many new things you can deduce starting from just a few statements that we label as true. Strictly speaking, there's more to it than just the starting 6 axioms. You could go even further and ask yourself, "What does a tree, a node or a child actually mean?" but here I find it important to be practical. As long as the underlying language used to define these "axioms" is the same for everyone (e.g. it is clear what a child node means), then the constraints are a good starting point to explore.
