@@ -20,38 +20,16 @@ func mustPanic(t *testing.T, fn func()) {
 }
 
 // assertRBTProperties checks the following by visiting each node once:
-// - All nodes are either red or black.
-// - The root is black.
-// - TNIL leaves are black.
-// - If a node is red, both its children are black.
-// - For each node, all paths to the (TNIL) leaves have the same number of
-// black nodes.
-// - On top of these RBT properties, it also checks the binary search tree
+// 1. All nodes are either red or black.
+// 2. The root is black.
+// 3. TNIL leaves are black.
+// 4. If a node is red, both its children are black.
+// 5. For each node, all simple paths to the (TNIL) leaves have the same number
+// of black nodes.
+//
+// On top of these RBT properties, it also checks the binary search tree
 // property that for a node, all values of the left children are smaller and
 // all values of the right children are larger.
-//
-// Additionally, we assert that any subtree rooted at node x contains at least
-// 2 ^ bh(x) - 1 internal nodes (this can be proven easily via induction). It
-// can be used to show that the height of a tree is at most 2lg(n+1) (thus
-// proving the logarithmic comlexity of the operations):
-//
-// - Because each red node has two black children, then bh(root) is at least
-// h/2, given a black child (TNIL or not) will always follow a red child.
-// - Therefore, the tree has at least 2 ^ (h/2) - 1 internal nodes. If the number
-// of the nodes is n, then so n >= 2 ^ (h/2) - 1
-// - This yields h <= 2 * lg(n+1)
-//
-// Notes:
-// - An "internal" node is a node that is not TNIL.
-// - The height of a tree (or subtree) rooted at x for a red black tree has a
-// different meaning than a regular tree, as it includes TNIL nodes. The height
-// of an internal leaf is considered to be 1, not 0. This is because height is
-// generally defined as the number of edges of the maximum path from the root to
-// the leaves, and in an RBT TNILs are considered leaves.
-// - bh(x) means the black height of tree (or subtree) rooted at x and it does
-// not include the node x, but it does include TNILs. The black height of an
-// internal leaf is therefore 1.
-// - lg means logarithm with base 2.
 func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 	t.Helper()
 
@@ -69,96 +47,55 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 	}
 
 	if tree.Root().color != _COLOR_BLACK {
-		t.Fatal("root should be black")
+		t.Fatal("property 2 violation: root should be black")
 	}
 
-	// blen represents the accumulated black path length up to the node. This
-	// needs to be calculated when going downwards, since the parents must be
-	// explored.
-	//
-	// internalNodeCount represents the internal node count fo the subtree, and
-	// parentbh represents the black height a parent of n would have (this is
-	// the same regardless of a parent's color since the parent is not included).
-	// This needs to be calculated going upwards, since the node's children have
-	// to be explored.
-
-	// lo and hi represent the boundaries to compare the current value against
-	// to validate the binary search tree property. Use pointers here because
-	// sometimes there are no bounds (e.g. the root can have any value, when
-	// going down on the leftmost or rightmost brach we can encounter arbitrarily
-	// small or large values, respectively)
-	var walk func(n *RBTNode[T], blen int, lo, hi *T) (internalNodeCount int, parentbh int)
-	rootblen := -1 // unset
-	walk = func(n *RBTNode[T], blen int, lo, hi *T) (int, int) {
+	var walk func(n *RBTNode[T], bnCount int, lo, hi *T)
+	bnCountTarget := -1 // unset
+	walk = func(n *RBTNode[T], bncount int, lo, hi *T) {
 
 		if n.color != _COLOR_RED && n.color != _COLOR_BLACK {
-			t.Fatal("found a node with an invalid color")
+			t.Fatal("property 1 violation: found a node with an invalid color")
 		}
 
 		if n.isSentinel() {
-			// this may be unnecessary
 			if n.color != _COLOR_BLACK {
-				t.Fatal("sentinel node should be black")
+				t.Fatal("property 3 violation: sentinel node should be black")
 			}
-			if rootblen == -1 {
-				rootblen = blen
+			// if we haven't explore any simple path to TNIL yet, set it as the
+			// target to compare to. Otherwise, compare it against an existing
+			// target since the black node count must match.
+			if bnCountTarget == -1 {
+				bnCountTarget = bncount
 			}
-			if rootblen != blen {
-				t.Fatal("found two paths with different black length")
+			if bnCountTarget != bncount {
+				t.Fatal("property 5 violation: found two paths with different black length")
 			}
-			return 0, 1
+			return
 		}
 
-		// check BST properties
 		v := n.Value()
 		if lo != nil && v <= *lo {
-			t.Errorf("bst property violated: %v is in the right subtree of %v", v, *lo)
+			t.Errorf("bst violation: %v is in the right subtree of %v", v, *lo)
 		}
 		if hi != nil && v >= *hi {
-			t.Errorf("bst property violated: %v is in the left subtree of %v", v, *hi)
+			t.Errorf("bst violation: %v is in the left subtree of %v", v, *hi)
 		}
 
-		// now check RBT properties
-
-		// may include TNIL leaves, which is fine
 		if n.color == _COLOR_RED &&
 			(n.left.color != _COLOR_BLACK || n.right.color != _COLOR_BLACK) {
-			t.Fatal("found red node whose children aren't both black")
+			t.Fatal("property 4: found red node whose children aren't both black")
 		}
 
 		if n.color == _COLOR_BLACK {
-			// increase black length going downwards
-			blen += 1
+			bncount += 1
 		}
 
-		// actually walk up to the sentinel here
-		incl, bhl := walk(n.left, blen, lo, &v)
-		incr, bhr := walk(n.right, blen, &v, hi)
-		bh := max(bhl, bhr)
-
-		nc := incl + incr + 1
-		if nc < 1<<bh-1 {
-			t.Fatal("found a subtree with less than 2^bh(x)-1 nodes")
-		}
-
-		// increase black height going upwards.
-		if n.color == _COLOR_BLACK {
-			bh += 1
-		}
-
-		return incl + incr + 1, bh
+		walk(n.left, bncount, lo, &v)
+		walk(n.right, bncount, &v, hi)
 	}
 
-	nc, bh := walk(tree.Root(), 0, nil, nil)
-
-	// note that rootblen does not increment for sentinels, and bh represents
-	// the black height of a fictional parent of the root (and the root is black)
-	if bh-1 != rootblen {
-		t.Fatal("calculated black height must match path length")
-	}
-	if nc < 1<<(bh-1)-1 {
-		t.Fatal("root has less than 2^bh(root)-1 nodes")
-	}
+	walk(tree.Root(), 0, nil, nil)
 }
 
 func TestRBTPropertiesDeterministicPermutations(t *testing.T) {
