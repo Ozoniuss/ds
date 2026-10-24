@@ -44,8 +44,6 @@ func NewRBT[T cmp.Ordered]() *RBT[T] {
 
 // Root() returns the root of the tree.
 func (t *RBT[T]) Root() *RBTNode[T] {
-	panicIfNilRBT(t)
-
 	// tnil must not be exposed externally
 	if t.root == t.tnil {
 		return nil
@@ -56,15 +54,11 @@ func (t *RBT[T]) Root() *RBTNode[T] {
 
 // Size returns the number of internal nodes in the tree.
 func (t *RBT[T]) Size() int {
-	panicIfNilRBT(t)
-
 	return t.size
 }
 
 // Count returns the number of times a value was added to the tree.
 func (t *RBT[T]) Count(value T) int {
-	panicIfNilRBT(t)
-
 	if t.root == t.tnil {
 		return 0
 	}
@@ -84,7 +78,6 @@ func (t *RBT[T]) Count(value T) int {
 
 // InsertUnique adds a unique value to the tree.
 func (t *RBT[T]) InsertUnique(value T) {
-	panicIfNilRBT(t)
 	t.lazyInit()
 
 	if t.root == t.tnil {
@@ -181,7 +174,6 @@ func insertFixup[T cmp.Ordered](t *RBT[T], z *RBTNode[T]) {
 
 // Delete removes a value from the tree.
 func (t *RBT[T]) Delete(value T) {
-	panicIfNilRBT(t)
 	t.lazyInit()
 
 	// find z
@@ -349,12 +341,6 @@ func sentinel[T cmp.Ordered]() *RBTNode[T] {
 	return &RBTNode[T]{
 		color:    _COLOR_BLACK,
 		sentinel: true,
-	}
-}
-
-func panicIfNilRBT[T cmp.Ordered](t *RBT[T]) {
-	if t == nil {
-		panic("nil rbt")
 	}
 }
 
