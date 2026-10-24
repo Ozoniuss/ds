@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"testing"
 )
 
@@ -76,10 +77,10 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 
 		v := n.Value()
 		if lo != nil && v <= *lo {
-			t.Errorf("bst violation: %v is in the right subtree of %v", v, *lo)
+			t.Fatalf("bst violation: %v is in the right subtree of %v", v, *lo)
 		}
 		if hi != nil && v >= *hi {
-			t.Errorf("bst violation: %v is in the left subtree of %v", v, *hi)
+			t.Fatalf("bst violation: %v is in the left subtree of %v", v, *hi)
 		}
 
 		if n.color == _COLOR_RED &&
@@ -99,13 +100,19 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 }
 
 func TestRBTPropertiesDeterministicPermutations(t *testing.T) {
+	t.Parallel()
 	rng := rand.New(rand.NewPCG(6, 9))
 
 	for i := range 100 {
 		n := rng.IntN(1_000) + 1
 		values := rng.Perm(1_000)[:n]
+		shuffled := slices.Clone(values)
+		rng.Shuffle(len(shuffled), func(i, j int) {
+			shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+		})
 
-		t.Run(fmt.Sprintf("%03d/n=%d", i, n), func(t *testing.T) {
+		t.Run(fmt.Sprintf("same order deletion/%03d/n=%d", i, n), func(t *testing.T) {
+			t.Parallel()
 			tr := NewRBT[int]()
 			cnt := 0
 			for _, v := range values {
@@ -117,6 +124,28 @@ func TestRBTPropertiesDeterministicPermutations(t *testing.T) {
 				}
 			}
 			for _, v := range values {
+				tr.Delete(v)
+				cnt -= 1
+				assertRBTProperties(t, tr)
+				if tr.Size() != cnt {
+					t.Fatalf("tree size is not %d after deletes: %d", cnt, tr.Size())
+				}
+			}
+		})
+
+		t.Run(fmt.Sprintf("shuffled deletion/%03d/n=%d", i, n), func(t *testing.T) {
+			t.Parallel()
+			tr := NewRBT[int]()
+			cnt := 0
+			for _, v := range values {
+				tr.InsertUnique(v)
+				cnt += 1
+				assertRBTProperties(t, tr)
+				if tr.Size() != cnt {
+					t.Fatalf("tree size is not %d after inserts: %d", cnt, tr.Size())
+				}
+			}
+			for _, v := range shuffled {
 				tr.Delete(v)
 				cnt -= 1
 				assertRBTProperties(t, tr)
