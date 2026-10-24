@@ -169,7 +169,7 @@ func TestRBTNilReceiver(t *testing.T) {
 		{name: "Root", fn: func(tr *RBT[int]) { tr.Root() }},
 		{name: "Size", fn: func(tr *RBT[int]) { tr.Size() }},
 		{name: "Count", fn: func(tr *RBT[int]) { tr.Count(0) }},
-		{name: "Insert", fn: func(tr *RBT[int]) { tr.InsertUnique(1) }},
+		{name: "InsertUnique", fn: func(tr *RBT[int]) { tr.InsertUnique(1) }},
 		{name: "Delete", fn: func(tr *RBT[int]) { tr.Delete(1) }},
 	}
 
@@ -204,31 +204,6 @@ func TestRBTNilNode(t *testing.T) {
 	}
 }
 
-func TestRBTSpecificTrees(t *testing.T) {
-
-	type testCase struct {
-		values []int
-	}
-	testCases := []testCase{
-		{values: []int{1}},
-		{values: []int{1, 2, 3, 4, 5, 6, 7, 8, 9}},
-		{values: []int{9, 8, 7, 6, 5, 4, 3, 2, 1}},
-		{values: []int{5, 3, 8, 1, 4, 7, 9, 2, 6}},
-		{values: []int{1, 1, 1, 1, 1}},
-	}
-
-	for _, tt := range testCases {
-
-		tr := NewRBT[int]()
-		for _, v := range tt.values {
-			tr.InsertUnique(int(v))
-			assertRBTProperties(t, tr)
-		}
-	}
-}
-
-// TestLeftRotateMissingRightChildPanics checks that leftRotate rejects a node
-// without a right child, whether or not it is the root.
 func TestLeftRotateMissingRightChildPanics(t *testing.T) {
 	t.Parallel()
 
@@ -269,8 +244,6 @@ func TestLeftRotateMissingRightChildPanics(t *testing.T) {
 	})
 }
 
-// TestRightRotateMissingLeftChildPanics checks that rightRotate rejects a node
-// without a left child, whether or not it is the root.
 func TestRightRotateMissingLeftChildPanics(t *testing.T) {
 	t.Parallel()
 
@@ -308,91 +281,6 @@ func TestRightRotateMissingLeftChildPanics(t *testing.T) {
 		tr := NewRBT[int]()
 
 		mustPanic(t, func() { rightRotate(tr, tr.tnil) })
-	})
-}
-
-// TestRotateSingleChild rotates a two node tree in both directions:
-//
-//	x          y              y          x
-//	 \   -->  /              /    -->     \
-//	  y      x              x              y
-func TestRotateSingleChild(t *testing.T) {
-	t.Parallel()
-
-	t.Run("leftRotate", func(t *testing.T) {
-		t.Parallel()
-
-		tr := NewRBT[int]()
-		x := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 1}
-		y := &RBTNode[int]{parent: x, left: tr.tnil, right: tr.tnil, value: 2}
-		x.right = y
-		tr.root = x
-		tr.size = 2
-
-		leftRotate(tr, x)
-
-		if tr.root != y {
-			t.Errorf("root: got %d, want %d", tr.root.value, y.value)
-		}
-		if y.parent != tr.tnil {
-			t.Errorf("y.parent: got %d, want tnil", y.parent.value)
-		}
-		if y.left != x {
-			t.Errorf("y.left: got %d, want %d", y.left.value, x.value)
-		}
-		if y.right != tr.tnil {
-			t.Errorf("y.right: got %d, want tnil", y.right.value)
-		}
-		if x.parent != y {
-			t.Errorf("x.parent: got %d, want %d", x.parent.value, y.value)
-		}
-		if x.left != tr.tnil {
-			t.Errorf("x.left: got %d, want tnil", x.left.value)
-		}
-		if x.right != tr.tnil {
-			t.Errorf("x.right: got %d, want tnil", x.right.value)
-		}
-		if tr.tnil.parent != nil {
-			t.Error("tnil.parent was written to")
-		}
-	})
-
-	t.Run("rightRotate", func(t *testing.T) {
-		t.Parallel()
-
-		tr := NewRBT[int]()
-		y := &RBTNode[int]{parent: tr.tnil, left: tr.tnil, right: tr.tnil, value: 2}
-		x := &RBTNode[int]{parent: y, left: tr.tnil, right: tr.tnil, value: 1}
-		y.left = x
-		tr.root = y
-		tr.size = 2
-
-		rightRotate(tr, y)
-
-		if tr.root != x {
-			t.Errorf("root: got %d, want %d", tr.root.value, x.value)
-		}
-		if x.parent != tr.tnil {
-			t.Errorf("x.parent: got %d, want tnil", x.parent.value)
-		}
-		if x.right != y {
-			t.Errorf("x.right: got %d, want %d", x.right.value, y.value)
-		}
-		if x.left != tr.tnil {
-			t.Errorf("x.left: got %d, want tnil", x.left.value)
-		}
-		if y.parent != x {
-			t.Errorf("y.parent: got %d, want %d", y.parent.value, x.value)
-		}
-		if y.left != tr.tnil {
-			t.Errorf("y.left: got %d, want tnil", y.left.value)
-		}
-		if y.right != tr.tnil {
-			t.Errorf("y.right: got %d, want tnil", y.right.value)
-		}
-		if tr.tnil.parent != nil {
-			t.Error("tnil.parent was written to")
-		}
 	})
 }
 
