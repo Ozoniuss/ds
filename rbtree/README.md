@@ -2,16 +2,12 @@
 
 Provides a red black tree implementation in Go. Oriented towards competitive programming or the implementation of other data structures such as ordered sets and ordered multisets.
 
-The library exposes a minimal public interface. In general, the way it thinks about modelling trees looks something like below. Note that this is not an actual interface exposed by the rbtree package, primarily because there isn't really a reason to abstract it under an interface, but also for some technical reasons (see appendix).
-
-Additionally, note that `Insert` and `Delete` don't actually return errors, since it is assumed that the operations being performed are always valid. This is by design and consistent with the writes allowed on `list` and `map` types. However, they also don't return any information about the change that happened. This can be limiting (e.g. you only want to insert up to K elements in a tree) and I am open to extending it in the future, but for I felt that the of use-cases where knowing what the operation did was limited. Adding a return type to the API is a backwards-compatible change and starting with an empty return type allows me to think a bit more about what should actually be returned before locking in the return type. For similar reasons, the current implementation does not allow storing duplicates.
+The library exposes a minimal public interface. In general, the way it thinks about modelling trees looks something like below. Note that this is not an actual interface exposed by the rbtree package, primarily because there isn't really a reason to abstract it under an interface, but also for some technical reasons (see appendix). My intention with the snippet below is to rather present it as documentation.
 
 ```go
 // Tree represents the possible operations on binary search trees. Various tree
 // types (e.g. regular BST, balanced BST, red black tree etc.) implement this
 // interface.
-//
-// Calling any method on a nil tree should panic.
 //
 // To match semantics of list and map Go containers, a tree that is initialized
 // directly via the type itself should be a valid tree with size 0.
@@ -42,13 +38,27 @@ type Tree[T cmp.Ordered] interface {
 
 // Node represents a node in a binary search tree. It is read-only.
 //
-// Nodes are not meant to be modified directly as all operations are expected
-// to be performed using the Tree object. This is to prevent producing a tree
-// that does not satisfy the binary search tree properties. The primary reason
-// it exists in the first place is to allow defining custom traversal algorithms
-// on the tree.
+// All writes to the tree happen via the Tree object, since writes defined on
+// Nodes don't have a clear expected behavior. Consider the following:
 //
-// Calling any method on a nil node should panic.
+//	  8
+//	 / \
+//	4   9
+//
+// If writes were allowed on Nodes, writing "6" via the node "9" should not
+// place it as a child of "9" since that would violate the BST property of the
+// entire tree. Deletes are even more confusing: it may or may not delete the
+// node on which the operation is called on. Therefore, a write via any node
+// that is part of the tree should be treated the same way as a write via the
+// root node. For me, it's simpler to think of the write operation as "write a
+// value to the tree" rather than "write a value to this node that is part of a
+// tree".
+// 
+// Similarly, retrieving the tree size and root via the node has an ambiguous 
+// meaning. These values can either be the same for all nodes part of a tree,
+// but could also mean the size and root of the tree object rooted at that node.
+// Having two abstractions makes the intent clear and doesn't require
+// distinguishing between the "root" node and other nodes.
 type Node[T cmp.Ordered] interface {
 	// Value returns the value stored in the node.
 	Value() T

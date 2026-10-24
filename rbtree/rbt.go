@@ -14,12 +14,8 @@ const (
 	_COLOR_BLACK = "black"
 )
 
-// A red-black tree is a binary search tree with one extra bit of storage per node: its
-// color, which can be either RED or BLACK. By constraining the node colors on any
-// simple path from the root to a leaf, red-black trees ensure that no such path is more
-// than twice as long as any other, so that the tree is approximately balanced.
+// RBT is a binary search tree that satisfies the following properties:
 //
-// A red-black tree is a binary tree that satisﬁes the following red-black properties:
 // 1. Every node is either red or black.
 // 2. The root is black.
 // 3. Every leaf (TNIL -- see below) is black.
@@ -27,60 +23,14 @@ const (
 // 5. For each node, all simple paths from the node to descendant leaves contain the
 // same number of black nodes.
 //
-// A red-black tree with n internal nodes has height at most 2*lg(n+1).
-//
-// Typically, a tree will only contain unique values. By default, RBT enforces
-// that constraint but can be configured to accept multiple values.
-//
-// The zero value is an empty tree that is ready to use. Note that options can
-// only be passed through NewRBT, so such a tree never accepts duplicates.
-//
-// There is a distinction between a tree object and a node object in order to
-// have a clearer interface. All write operations and methods that return information
-// about the entire tree are only defined on the tree object. The node object is
-// read-only and only returns information about the node itself. Particularly:
-//
-// - All writes to the tree happen via the Tree object. Node objects are read-only.
-// Consider the following tree:
-//
-//	  8
-//	 / \
-//	4   9
-//
-// If writes were allowed on Nodes, writing "6" via the node "9" should not
-// place it as a child of "9" since that would violate the BST property of the
-// entire tree. Deletes are even more confusing: it may or may not delete the
-// node on which the operation is called on. Therefore, a write via any node that
-// is part of the tree should be treated the same way as a write via the root node.
-// It's simpler to thinkof the write operation as "write a value to the tree"
-// rather than "write a value to this node that is part of a tree".
-//
-// - Retrieving the tree size and root via the node has an ambiguous meaning.
-// These values can either be the same for all nodes part of a tree, but could
-// also mean the size and root of the tree object rooted at that node. Having
-// two abstractions makes the intent clear and doesn't require distinguishing
-// between the "root" node and other nodes.
+// RBT currently only supports unique values.
 type RBT[T cmp.Ordered] struct {
-	// Represents the root node of a tree. A tree created through the type
-	// directly will set this to nil until the first write, whereas an
-	// initialized tree will set this to tnil.
+	// root must be lazily initialized when the tree is not created via its
+	// constructor.
 	root *RBTNode[T]
-	// Represents the number of nodes in the tree, excluding sentinel nodes (see
-	// below).
+	// size excludes sentinel nodes
 	size int
-	// As a matter of convenience in dealing with boundary conditions in red-black
-	// tree code, we use a single sentinel to represent nil-valued nodes. This sentinel
-	// is an object with the same attributes as an ordinary node in the tree. Its
-	// color attribute is BLACK, and its other attributes have no meaning so are
-	// set to the default value of their type. We refer to this sentinel as "tnil".
-	// (however during methods, the values of the sentinel MAY chang, in which
-	// case another sentinel should be used).
-	//
-	// If the left or right child of a node is empty, we set it to tnil instead
-	// of nil. Similarly, we set the parent of the root node to tnil.
-	//
-	// Note that all nil-valued nodes are set to the same tnil sentinel, meaning
-	// that the parent of the sentinel is also unset.
+	// sentinel value all internal leaves and the root point to in this tree
 	tnil *RBTNode[T]
 }
 
@@ -104,16 +54,14 @@ func (t *RBT[T]) Root() *RBTNode[T] {
 	return t.root
 }
 
-// Size returns the number of nodes in the tree.
+// Size returns the number of internal nodes in the tree.
 func (t *RBT[T]) Size() int {
 	panicIfNilRBT(t)
 
 	return t.size
 }
 
-// Count returns the number of times a value was added to the tree. If the tree
-// is not configured to accept multiple values, this operation will always return
-// either 0 or 1.
+// Count returns the number of times a value was added to the tree.
 func (t *RBT[T]) Count(value T) int {
 	panicIfNilRBT(t)
 
@@ -139,8 +87,6 @@ func (t *RBT[T]) Insert(value T) {
 	panicIfNilRBT(t)
 	t.lazyInit()
 
-	// create the root node if not available. classic textbook implementation
-	// handles this in insertFixup, but writing it here for better readability.
 	if t.root == t.tnil {
 		t.root = &RBTNode[T]{
 			parent: t.tnil,
@@ -191,66 +137,21 @@ func (t *RBT[T]) Insert(value T) {
 	t.size++
 }
 
-// insertFixup restores the RBT properties after an insertion, starting from the
-// node being inserted. It will attempt to fix the following property:
-//
-// - If a node is red, then both its children are black (in case z's parent
-// was red) (4)
-//
-// The rest properties should continue to hold (my implementation handles inserting
-// the root explicitly so the root being black (2) holds at this point).
+// insertFixup will perform rebalancing after insertion, when needed
 func insertFixup[T cmp.Ordered](t *RBT[T], z *RBTNode[T]) {
-	// we only need to rebalance for a red parent. this loop has the followig
-	// invariants for each iteration:
-	//
-	// - z is red
-	// - if z.p is the root, z.p is black
-	// - if the tree violates any property, it will violate property (4) or
-	// property (2). Note that in the beginning it does not violate property (2),
-	// but it may end up doing so along the way.
-	//
-	// during each loop, z either moves up the tree, or we perform rotations
-	// and the loop terminates
+
 	for z.parent.color == _COLOR_RED {
-		// because the parent is red, it will definitely have an internal parent
-		// too.
 		if z.parent == z.parent.parent.left {
 			y := z.parent.parent.right
 			if y.color == _COLOR_RED {
-				// we can solve this with a simple recoloring. basically the
-				// grandparent becomes red and its children become black, which
-				// doesn't change the black path property. but now, root may
-				// have become red, or the parent of the grandparent will be
-				// red (and obviously z is still red since it points to that)
-				//
-				// z moves up two nodes here to advance the loop
 				z.parent.color = _COLOR_BLACK
 				y.color = _COLOR_BLACK
 				z.parent.parent.color = _COLOR_RED
 				z = z.parent.parent
-
-				// once we get to these branches, we will terminate in at most
-				// two iterations
 			} else if z == z.parent.right {
-				// this rotation will actually turn this case into the final
-				// else branch next iteration. remember that this left rotation
-				// moves z to its left child after becoming the parent. after
-				// this, z will still be red with a red parent.
 				z = z.parent
 				leftRotate(t, z)
 			} else {
-				// here we basically have a situation like this (I did not draw the
-				// other children, but they may be there):
-				//            C(b)                           B(b)
-				//       B(r)         ------>    z -->  A(r)     C(r)
-				//   A(r)  <---- z
-				///
-				// This one is a bit harder to follow but essentially only z
-				// is violating the RBT properties. z's children will stay the
-				// same, B's right child is already black and C's right child is
-				// also black (otherwise we would branch on the first statement of
-				// the loop) so boving them to be the children of C is still
-				// valid. We actually terminate the loop here.
 				z.parent.color = _COLOR_BLACK
 				z.parent.parent.color = _COLOR_RED
 				rightRotate(t, z.parent.parent)
@@ -318,41 +219,23 @@ func (t *RBT[T]) Delete(value T) {
 		x = z.left
 		rbtransplant(t, z, z.left) // z.left may be tnil
 	} else {
-		// set y to the successor of z. y has no left children
 		y = treeMinimumRbt(t, z.right)
 		yorigcolor = y.color
-
-		// move y's right subtree to y, since (node) y will move to z
 		x = y.right
 		if y.parent == z {
-			// z.right is right skewed
 			x.parent = y
 		} else {
 			rbtransplant(t, y, y.right) // y.right may be tnil
-			// note that this is ok because y does nto change in transplant. y will
-			// become x here  and will be "detached" from its original right child
 			y.right = z.right
 			y.right.parent = y
 		}
 
-		// at this point y is some sort of incomplete node with only its right
-		// side completely formed. change its parent via transplant and attach
-		// the right subtree (from z)
 		rbtransplant(t, z, y)
 		y.left = z.left
 		y.left.parent = y
 		y.color = z.color
 	}
 
-	// Took the explanation from the textbook since it's pretty good. We don't
-	// need a fixup if we moved a red node because:
-	// 1. No black-heights in the tree have changed.
-	// 2. No red nodes have been made adjacent. Because y takes z’s place in the
-	// tree, along with z’s color, we cannot have two adjacent red nodes at y’s new
-	// position in the tree. In addition, if y was not z’s right child, then y’s original
-	// right child x replaces y in the tree. If y is red, then x must be black, and so
-	// replacing y by x cannot cause two red nodes to become adjacent.
-	// 3. Since y could not have been the root if it was red, the root remains black.
 	if yorigcolor == _COLOR_BLACK {
 		rbtDeleteFixup(t, x) // x may be tnil, see above what can be tnil
 	}
@@ -360,18 +243,8 @@ func (t *RBT[T]) Delete(value T) {
 }
 
 // rbtDeleteFixup handles recoloring and rebalancing if a black node was removed
-// from the tree. This can happen in the following scenarios:
-//
-// - We removed the root and it had a red child moved to its position.
-// - One (the right?) child of the node y that moved and its parent were both red.
-// - Any simple paths containing y now have one less black node if y was black.
+// from the tree.
 func rbtDeleteFixup[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
-	// The proof of this is actually quite complicated. Let's assume that "x"
-	// has two colors, and when we moved it to y's location we essentially added
-	// a black color to it. This means black paths preserve that length, but
-	// we're violating property 1 now (every node is either red or black).
-	//
-	// within this loop, x will always point to a "doubly" black node
 	for x != t.root && x.color == _COLOR_BLACK {
 
 		if x == x.parent.left {
@@ -398,7 +271,6 @@ func rbtDeleteFixup[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) {
 				x = t.root
 			}
 		} else {
-			// see above
 			w := x.parent.left
 			if w.color == _COLOR_RED {
 				w.color = _COLOR_BLACK
@@ -590,9 +462,8 @@ func rightRotate[T cmp.Ordered](t *RBT[T], y *RBTNode[T]) {
 	y.parent = x
 }
 
-// transplant replaces one subtree u with another subtree v. It only changes the
-// parent v points to, and the child of u's parent to become v. Note that u
-// remains unchanged.
+// rbtransplant replaces one subtree u with another subtree v. Note that this
+// only changes v's references, u remains unchanged.
 func rbtransplant[T cmp.Ordered](t *RBT[T], u *RBTNode[T], v *RBTNode[T]) {
 	if t == nil || u == nil || v == nil {
 		panic("rbtransplant: called on nil tree or node")
