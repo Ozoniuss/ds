@@ -649,6 +649,183 @@ func TestInsert(t *testing.T) {
 	}
 }
 
+// TestTreeMinimum showcases which node treeMinimum returns for the subtree
+// rooted at x. The tree itself is not modified.
+func TestTreeMinimum(t *testing.T) {
+	t.Parallel()
+
+	type testcase struct {
+		name string
+
+		x       int
+		minimum int
+
+		tree string
+	}
+
+	cases := []testcase{
+		{
+			name:    "x has no left child, so x is the minimum",
+			x:       35,
+			minimum: 35,
+			tree: `
+              20[B]
+     v----------+----------v
+   10[R]                 30[R]
+ v---+---v             v---+---v
+5[B]   15[B]         25[B]   35[B]
+     v---+---v        /
+   12[R]   17[R]   22[R]`,
+		},
+		{
+			name:    "x has a left child with no left child, so that child is the minimum",
+			x:       25,
+			minimum: 22,
+			tree: `
+              20[B]
+     v----------+----------v
+   10[R]                 30[R]
+ v---+---v             v---+---v
+5[B]   15[B]         25[B]   35[B]
+     v---+---v        /
+   12[R]   17[R]   22[R]`,
+		},
+		{
+			name:    "x has a chain of left children, so the end of the chain is the minimum",
+			x:       20,
+			minimum: 5,
+			tree: `
+              20[B]
+     v----------+----------v
+   10[R]                 30[R]
+ v---+---v             v---+---v
+5[B]   15[B]         25[B]   35[B]
+     v---+---v        /
+   12[R]   17[R]   22[R]`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tr := parseRBTFromTests(strings.TrimPrefix(tc.tree, "\n"))
+
+			if got := treeMinimum(tr, findNode(tr, tc.x)); got != findNode(tr, tc.minimum) {
+				t.Fatalf("minimum of the subtree rooted at %d: got %d, want %d", tc.x, got.value, tc.minimum)
+			}
+		})
+	}
+}
+
+// TestTreeSuccessor showcases which node treeSuccessor returns for x, i.e. the
+// node that follows x in an in-order walk. The tree itself is not modified.
+func TestTreeSuccessor(t *testing.T) {
+	t.Parallel()
+
+	type testcase struct {
+		name string
+
+		x         int
+		successor int
+		// successor is the tnil sentinel and the successor field is ignored
+		successorSentinel bool
+
+		tree string
+	}
+
+	cases := []testcase{
+		{
+			name:      "x has a right child with no left child, so that child is the successor",
+			x:         15,
+			successor: 17,
+			tree: `
+              20[B]
+     v----------+----------v
+   10[R]                 30[R]
+ v---+---v             v---+---v
+5[B]   15[B]         25[B]   35[B]
+     v---+---v        /
+   12[R]   17[R]   22[R]`,
+		},
+		{
+			name:      "x has a right child with left children, so the minimum of the right subtree is the successor",
+			x:         20,
+			successor: 22,
+			tree: `
+              20[B]
+     v----------+----------v
+   10[R]                 30[R]
+ v---+---v             v---+---v
+5[B]   15[B]         25[B]   35[B]
+     v---+---v        /
+   12[R]   17[R]   22[R]`,
+		},
+		{
+			name:      "x has no right child and is a left child, so its parent is the successor",
+			x:         5,
+			successor: 10,
+			tree: `
+              20[B]
+     v----------+----------v
+   10[R]                 30[R]
+ v---+---v             v---+---v
+5[B]   15[B]         25[B]   35[B]
+     v---+---v        /
+   12[R]   17[R]   22[R]`,
+		},
+		{
+			name:      "x has no right child and is a right child, so the first ancestor reached from its left subtree is the successor",
+			x:         17,
+			successor: 20,
+			tree: `
+              20[B]
+     v----------+----------v
+   10[R]                 30[R]
+ v---+---v             v---+---v
+5[B]   15[B]         25[B]   35[B]
+     v---+---v        /
+   12[R]   17[R]   22[R]`,
+		},
+		{
+			name:              "x has no right child and is the rightmost node, so the sentinel is the successor",
+			x:                 35,
+			successorSentinel: true,
+			tree: `
+              20[B]
+     v----------+----------v
+   10[R]                 30[R]
+ v---+---v             v---+---v
+5[B]   15[B]         25[B]   35[B]
+     v---+---v        /
+   12[R]   17[R]   22[R]`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tr := parseRBTFromTests(strings.TrimPrefix(tc.tree, "\n"))
+			want := tr.tnil
+			if !tc.successorSentinel {
+				want = findNode(tr, tc.successor)
+			}
+
+			if got := treeSuccessor(tr, findNode(tr, tc.x)); got != want {
+				t.Fatalf("successor of %d: got %s, want %s", tc.x, describeNode(tr, got), describeNode(tr, want))
+			}
+		})
+	}
+}
+
+func describeNode(tr *RBT[int], n *RBTNode[int]) string {
+	if n == tr.tnil {
+		return "tnil"
+	}
+	return strconv.Itoa(n.value)
+}
+
 func findNode(tr *RBT[int], value int) *RBTNode[int] {
 	n := tr.root
 	for n != tr.tnil {
