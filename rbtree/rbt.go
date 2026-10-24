@@ -301,43 +301,31 @@ type RBTNode[T cmp.Ordered] struct {
 }
 
 func (n *RBTNode[T]) Value() T {
-	panicIfNilRBTNodeOrSentinel(n)
-
 	return n.value
 }
 
 func (n *RBTNode[T]) Parent() *RBTNode[T] {
-	panicIfNilRBTNodeOrSentinel(n)
-
-	if n.parent.isSentinel() {
+	if n.parent.sentinel {
 		return nil
 	}
 	return n.parent
 }
 
 func (n *RBTNode[T]) Left() *RBTNode[T] {
-	panicIfNilRBTNodeOrSentinel(n)
-
-	if n.left.isSentinel() {
+	if n.left.sentinel {
 		return nil
 	}
 	return n.left
 }
 
 func (n *RBTNode[T]) Right() *RBTNode[T] {
-	panicIfNilRBTNodeOrSentinel(n)
-
-	if n.right.isSentinel() {
+	if n.right.sentinel {
 		return nil
 	}
 	return n.right
 }
 
-func (n *RBTNode[T]) isSentinel() bool {
-	return n.sentinel
-}
-
-func sentinel[T cmp.Ordered]() *RBTNode[T] {
+func newSentinel[T cmp.Ordered]() *RBTNode[T] {
 	return &RBTNode[T]{
 		color:    _COLOR_BLACK,
 		sentinel: true,
@@ -348,23 +336,8 @@ func sentinel[T cmp.Ordered]() *RBTNode[T] {
 // t := &RBT{}).
 func (t *RBT[T]) lazyInit() {
 	if t.tnil == nil {
-		t.tnil = sentinel[T]()
+		t.tnil = newSentinel[T]()
 		t.root = t.tnil
-	}
-}
-
-// panicIfNilRBTNodeOrSentinel will panic if the current node is nil or a sentinel.
-// Sentinels are included because they are an implementation detail to simplify
-// edge case handling in algorithms, but in essence they still represent nil
-// nodes and should be exposed as nil from public methods.
-//
-// Note that this method is typically called for public methods, as algorithms
-// use the internal representation directly.
-func panicIfNilRBTNodeOrSentinel[T cmp.Ordered](n *RBTNode[T]) {
-	if n == nil {
-		panic("nil node")
-	} else if n.sentinel {
-		panic("nil node")
 	}
 }
 
@@ -451,12 +424,12 @@ func rightRotate[T cmp.Ordered](t *RBT[T], y *RBTNode[T]) {
 // rbtransplant replaces one subtree u with another subtree v. Note that this
 // only changes v's references, u remains unchanged.
 func rbtransplant[T cmp.Ordered](t *RBT[T], u *RBTNode[T], v *RBTNode[T]) {
-	if t == nil || u == nil || v == nil {
-		panic("rbtransplant: called on nil tree or node")
+	if u == nil || v == nil {
+		panic("rbtransplant: called on nil node")
 	}
 	// note that transplant may be called on a sentinel destination
-	if u.isSentinel() {
-		panic("rbtransplant: called on sentinel destination")
+	if u.sentinel {
+		panic("rbtransplant: u (source) must not be a sentinel")
 	}
 	// u is root, v becomes root
 	if u.parent == t.tnil {

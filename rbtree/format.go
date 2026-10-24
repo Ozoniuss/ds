@@ -71,7 +71,7 @@ const (
 // which would result in a negative x position without adjusting the child
 // representation).
 func BuildLines[T cmp.Ordered](n *RBTNode[T], shape int, minDistBetweenSubtrees int, shouldCenter bool, useTestFormat bool) []string {
-	if n == nil || n.isSentinel() {
+	if n == nil || n.sentinel {
 		panic("BuildLines: n must be an internal node")
 	}
 

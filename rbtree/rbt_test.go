@@ -58,7 +58,7 @@ func assertRBTProperties[T cmp.Ordered](t *testing.T, tree *RBT[T]) {
 			t.Fatal("property 1 violation: found a node with an invalid color")
 		}
 
-		if n.isSentinel() {
+		if n.sentinel {
 			if n.color != _COLOR_BLACK {
 				t.Fatal("property 3 violation: sentinel node should be black")
 			}
@@ -152,7 +152,7 @@ func TestRBTNilReceiver(t *testing.T) {
 	}
 }
 
-func TestRBTNilAndSentinelNodes(t *testing.T) {
+func TestRBTNilNode(t *testing.T) {
 	t.Parallel()
 
 	type method struct {
@@ -166,21 +166,12 @@ func TestRBTNilAndSentinelNodes(t *testing.T) {
 		{name: "Right", fn: func(n *RBTNode[int]) { n.Right() }},
 	}
 
-	nodes := []struct {
-		name string
-		node *RBTNode[int]
-	}{
-		{name: "nil", node: nil},
-		{name: "sentinel", node: sentinel[int]()},
-	}
-
-	for _, n := range nodes {
-		for _, m := range methods {
-			t.Run(n.name+"/"+m.name, func(t *testing.T) {
-				t.Parallel()
-				mustPanic(t, func() { m.fn(n.node) })
-			})
-		}
+	for _, m := range methods {
+		t.Run(m.name, func(t *testing.T) {
+			t.Parallel()
+			n := (*RBTNode[int])(nil)
+			mustPanic(t, func() { m.fn(n) })
+		})
 	}
 }
 
