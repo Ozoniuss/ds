@@ -22,8 +22,6 @@ const (
 // 4. If a node is red, then both its children are black.
 // 5. For each node, all simple paths from the node to descendant leaves contain the
 // same number of black nodes.
-//
-// RBT currently only supports unique values.
 type RBT[T cmp.Ordered] struct {
 	// root must be lazily initialized when the tree is not created via its
 	// constructor.
@@ -57,6 +55,22 @@ func (t *RBT[T]) Size() int {
 	return t.size
 }
 
+// For searching algorithms, it helps to know the following case is possible
+// when inserting 5, 1, 7, 5
+//
+//   5a
+//  /  \
+// 1    7
+//     /
+//   5b
+//
+// Or, when inserting 5,5,5
+//
+//   5b
+//  /  \
+// 5a   5c
+//
+
 // Count returns the number of times a value was added to the tree.
 func (t *RBT[T]) Count(value T) int {
 	if t.root == t.tnil {
@@ -64,22 +78,46 @@ func (t *RBT[T]) Count(value T) int {
 	}
 
 	c := t.root
+	first := t.tnil
+
 	for c != t.tnil {
-		if value < c.value {
+		if value <= c.value {
+			if value == c.value {
+				first = c
+			}
 			c = c.left
-		} else if value > c.value {
-			c = c.right
 		} else {
-			return 1
+			c = c.right
 		}
 	}
-	return 0
+	c = first
+
+	cnt := 0
+	for c != t.tnil && c.value == value {
+		cnt += 1
+		c = treeSuccessor(t, c)
+	}
+
+	return cnt
 }
 
-// InsertUnique adds a unique value to the tree.
+// InsertUnique adds a value to the tree, but only if the tree doesn't already
+// contain this value.
 func (t *RBT[T]) InsertUnique(value T) {
 	t.lazyInit()
 
+	insert(t, value, true)
+}
+
+// InsertEqual adds a value to the tree, regardless if the value already exists
+// or not.
+func (t *RBT[T]) InsertEqual(value T) {
+	t.lazyInit()
+
+	insert(t, value, false)
+}
+
+func insert[T cmp.Ordered](t *RBT[T], value T, unique bool) {
 	if t.root == t.tnil {
 		t.root = &RBTNode[T]{
 			parent: t.tnil,
@@ -101,14 +139,13 @@ func (t *RBT[T]) InsertUnique(value T) {
 	}
 	for x != t.tnil {
 		y = x
-
 		if z.value < x.value {
 			x = x.left
-		} else if z.value > x.value {
-			x = x.right
 		} else {
-			// found the node in the tree
-			return
+			if unique && x.value == z.value {
+				return
+			}
+			x = x.right
 		}
 	}
 	// at this point y is an internal leaf, and we set z as its child
@@ -172,21 +209,26 @@ func insertFixup[T cmp.Ordered](t *RBT[T], z *RBTNode[T]) {
 	t.root.color = _COLOR_BLACK
 }
 
-// Delete removes a value from the tree.
-func (t *RBT[T]) Delete(value T) {
+// DeleteOne removes a value from the tree. If there are duplicates, it will
+// remove the node of the last value that was inserted.
+func (t *RBT[T]) DeleteOne(value T) {
 	t.lazyInit()
 
-	// find z
+	// find the latest occurence of value
 	z := t.root
+	c := t.tnil
+
 	for z != t.tnil {
 		if value < z.value {
 			z = z.left
-		} else if value > z.value {
-			z = z.right
 		} else {
-			break
+			if z.value == value {
+				c = z
+			}
+			z = z.right
 		}
 	}
+	z = c
 
 	// nothing to delete
 	if z == t.tnil {
@@ -211,7 +253,7 @@ func (t *RBT[T]) Delete(value T) {
 		x = z.left
 		rbtransplant(t, z, z.left) // z.left may be tnil
 	} else {
-		y = treeMinimumRbt(t, z.right)
+		y = treeMinimum(t, z.right)
 		yorigcolor = y.color
 		x = y.right
 		if y.parent == z {
@@ -442,11 +484,25 @@ func rbtransplant[T cmp.Ordered](t *RBT[T], u *RBTNode[T], v *RBTNode[T]) {
 	v.parent = u.parent
 }
 
-// treeMinimumRbt finds the minimum value (the leftmost internal node) of the
+// treeMinimum finds the minimum value (the leftmost internal node) of the
 // subtree rooted at t.
-func treeMinimumRbt[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) *RBTNode[T] {
+func treeMinimum[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) *RBTNode[T] {
 	for x.left != t.tnil {
 		x = x.left
 	}
 	return x
+}
+
+// treeSuccessor returns the next node in the tree, or t.tnil if the current
+// node is the rightmost internal node
+func treeSuccessor[T cmp.Ordered](t *RBT[T], x *RBTNode[T]) *RBTNode[T] {
+	if x.right != t.tnil {
+		return treeMinimum(t, x.right)
+	}
+	y := x.parent
+	for y != t.tnil && x == y.right {
+		x = y
+		y = y.parent
+	}
+	return y
 }

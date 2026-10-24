@@ -88,7 +88,7 @@ func TestBFSReinsertionReproducesTree(t *testing.T) {
 			}
 
 			for _, v := range values {
-				tr.Delete(v)
+				tr.DeleteOne(v)
 			}
 
 			reinserted = recreateFromBFS(bfsColoredValues(tr.Root()))

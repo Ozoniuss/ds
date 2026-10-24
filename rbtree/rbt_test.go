@@ -124,7 +124,7 @@ func TestRBTPropertiesDeterministicPermutations(t *testing.T) {
 				}
 			}
 			for _, v := range values {
-				tr.Delete(v)
+				tr.DeleteOne(v)
 				cnt -= 1
 				assertRBTProperties(t, tr)
 				if tr.Size() != cnt {
@@ -146,7 +146,7 @@ func TestRBTPropertiesDeterministicPermutations(t *testing.T) {
 				}
 			}
 			for _, v := range shuffled {
-				tr.Delete(v)
+				tr.DeleteOne(v)
 				cnt -= 1
 				assertRBTProperties(t, tr)
 				if tr.Size() != cnt {
@@ -170,7 +170,7 @@ func TestRBTNilReceiver(t *testing.T) {
 		{name: "Size", fn: func(tr *RBT[int]) { tr.Size() }},
 		{name: "Count", fn: func(tr *RBT[int]) { tr.Count(0) }},
 		{name: "InsertUnique", fn: func(tr *RBT[int]) { tr.InsertUnique(1) }},
-		{name: "Delete", fn: func(tr *RBT[int]) { tr.Delete(1) }},
+		{name: "Delete", fn: func(tr *RBT[int]) { tr.DeleteOne(1) }},
 	}
 
 	for _, m := range methods {
