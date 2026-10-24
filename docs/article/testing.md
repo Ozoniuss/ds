@@ -1,14 +1,14 @@
 # Constraint-based testing
 
-> Before you read this, I want to emphasize that this article isn't about the theory behind Red-Black trees. No need to leave if that scares you;)
+> I want to emphasize that this article isn't about the theory behind Red-Black trees. No need to leave if that scares you;)
 
-For a while I've been working on a Red-Black tree library, and I kind of wanted to talk about my journey of coming up with a test suite for it. I found this part interesting, challenging and quite annoying all at the same time, as it got me stuck in so many trains of thought wondering if I have the right approach. Of all things, when you're implementing an efficient data structure module, arguably what you care about most is correctness. I mean, ergonomics and performance don't really mean much when the code is not working as expected. In fact, most of my effort so far went into the testing suite, since the algorithms are a [textbook](https://www.cs.mcgill.ca/~akroit/math/compsci/Cormen%20Introduction%20to%20Algorithms.pdf) rip-off (though you can find them pretty much everywhere online).
+For a while I’ve been working on a Red-Black tree library, and I kind of wanted to talk about my journey of coming up with a test suite for it. I found this part interesting, challenging and quite annoying all at the same time, as it got me stuck in so many thought loops wondering if I had the right approach. When you’re implementing an efficient data structure, arguably what you care about most is correctness. I mean, ergonomics and performance don’t really mean much when the code isn’t working as expected. In fact, most of my effort so far has gone into the testing suite, since the algorithms are a [textbook](https://www.cs.mcgill.ca/~akroit/math/compsci/Cormen%20Introduction%20to%20Algorithms.pdf) rip-off (though you can find them pretty much everywhere online).
 
-When you want correctness, it means you want to write _a lot_ of tests. And that came with problems.
+When you want correctness, you want to write a lot of tests. And that came with problems.
 
 ## Writing down a tree
 
-Let's start with how you'd typically use a binary tree. I'd say most cases are summarized by:
+Let's start with how you'd typically use a binary tree. I'd say most cases look something like this:
 
 ```go
 
@@ -359,3 +359,19 @@ Honestly, to me it's a matter of taste. I think if you chase the "perfect" abstr
 What I love about constraints is that you can use them to infer other constraints. For Red-Black trees, one particularly interesting one is that a subtree rooted at a node `x` contains at least `2^bh(x) - 1` internal nodes, where `bh` is the black height of the node. In turn, this implies that the height of any Red-Black tree is at most `2*lg(n+1)`, where `n` is the number of nodes. That gives you more possibilities when deciding which sets of constraints you might want to validate in your tests, because some may have more efficient algorithms to check or may simply be easier to write. Just be careful when testing a different set of constraints than the original ones, as **they must imply the original set of constraints**. Just satisfying the height property alone **does not** imply a tree is a Red-Black tree.
 
 > I like math a lot, so I like to think of the starting constraints as some axioms that define a space where you can play around and explore its properties. It's just amazing how many new things you can deduce starting from just a few statements that we label as true. Strictly speaking, there's more to it than just the starting 6 axioms. You could go even further and ask yourself, "What does a tree, a node or a child actually mean?" but here I find it important to be practical. As long as the underlying language used to define these "axioms" is the same for everyone (e.g. it is clear what a child node means), then the constraints are a good starting point to explore.
+
+
+
+One of my favourite ideas when solving math problems was looking for invariants. There is something fascinating about discovering a property that never changes as you explore a problem space. So it was really exciting to end up working with this concept in one of my projects.
+
+This time, it was kind of the other way around. I had a set of constraints to start with and rather than discovering invariants, I needed to write an implementation that preserves them. That is because they allow me to build a performant data structure.
+
+I just released another article. This one is about the challenges I faced when writing tests for my Red-Black tree library. There are quite a few issues with a "traditional" approach, and it took a while to put together a test suite that gives me enough confidence. And while dealing with invariants was lots of fun, I do find that the way you think about them in a practical situation is a bit different from what I was used to.
+
+Find my article on Substack:
+
+https://ozoniuss.substack.com/p/maybe-you-should-just-test-your-constraints?r=59otjd&utm_campaign=post&utm_medium=web&showWelcomeOnShare=true
+
+You can check out my implementation on GitHub, though there's still plenty to clean up.
+
+https://github.com/Ozoniuss/ds
