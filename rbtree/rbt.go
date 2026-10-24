@@ -82,8 +82,8 @@ func (t *RBT[T]) Count(value T) int {
 	return 0
 }
 
-// Insert adds a value to the tree.
-func (t *RBT[T]) Insert(value T) {
+// InsertUnique adds a unique value to the tree.
+func (t *RBT[T]) InsertUnique(value T) {
 	panicIfNilRBT(t)
 	t.lazyInit()
 

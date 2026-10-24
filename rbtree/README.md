@@ -17,18 +17,15 @@ type Tree[T cmp.Ordered] interface {
 	Root() Node[T]
 	// Return the number of nodes in the tree.
 	Size() int
-	// Count returns the number of elements with value `value` present in the
-	// tree. Implementations that require unique values will either return 0
-	// or 1.
-	//
-	// Use this method if you need to determine whether a value belongs to the
-	// tree or not.
+	// Count returns the number of elements with the given value present in the
+	// tree.
 	Count(value T) int
-	// Insert a value to the binary search tree. Implementations should
-    // guarantee the value exists or its count was increased by 1 in the case of
-    // trees accepting multiple values, once this method was called. Otherwise,
-    // the method must panic.
-	Insert(value T)
+	// InsertUnique adds an element to the tree, if the value wasn't previously
+	// inserted. 
+	InsertUnique(value T)
+	// InsertEqual adds an element to the tree regardless whether the value was
+	// previously inserted or not. A new node should be allocated for that value.
+	InsertEqual(value T)
 	// Delete a value from the binary search tree. Implementations should
     // guarantee the value no longer exists or its count was decreased by 1 in
     // the case of  trees accepting multiple values, once this method was

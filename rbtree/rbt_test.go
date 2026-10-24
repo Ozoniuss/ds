@@ -109,7 +109,7 @@ func TestRBTPropertiesDeterministicPermutations(t *testing.T) {
 			tr := NewRBT[int]()
 			cnt := 0
 			for _, v := range values {
-				tr.Insert(v)
+				tr.InsertUnique(v)
 				cnt += 1
 				assertRBTProperties(t, tr)
 				if tr.Size() != cnt {
@@ -140,7 +140,7 @@ func TestRBTNilReceiver(t *testing.T) {
 		{name: "Root", fn: func(tr *RBT[int]) { tr.Root() }},
 		{name: "Size", fn: func(tr *RBT[int]) { tr.Size() }},
 		{name: "Count", fn: func(tr *RBT[int]) { tr.Count(0) }},
-		{name: "Insert", fn: func(tr *RBT[int]) { tr.Insert(1) }},
+		{name: "Insert", fn: func(tr *RBT[int]) { tr.InsertUnique(1) }},
 		{name: "Delete", fn: func(tr *RBT[int]) { tr.Delete(1) }},
 	}
 
@@ -201,7 +201,7 @@ func TestRBTSpecificTrees(t *testing.T) {
 
 		tr := NewRBT[int]()
 		for _, v := range tt.values {
-			tr.Insert(int(v))
+			tr.InsertUnique(int(v))
 			assertRBTProperties(t, tr)
 		}
 	}
@@ -415,7 +415,7 @@ func FuzzRBTEachInsert(f *testing.F) {
 
 		tr := NewRBT[int]()
 		for i, v := range values {
-			tr.Insert(int(v))
+			tr.InsertUnique(int(v))
 
 			assertRBTProperties(t, tr)
 			if t.Failed() {

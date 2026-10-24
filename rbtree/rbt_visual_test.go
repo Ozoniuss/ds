@@ -79,7 +79,7 @@ func TestBFSReinsertionReproducesTree(t *testing.T) {
 		t.Run(fmt.Sprintf("%03d/n=%d", i, n), func(t *testing.T) {
 			tr := NewRBT[int]()
 			for _, v := range values {
-				tr.Insert(v)
+				tr.InsertUnique(v)
 			}
 
 			reinserted := recreateFromBFS(bfsColoredValues(tr.Root()))
@@ -624,7 +624,7 @@ func TestInsert(t *testing.T) {
 				} else {
 					tr = parseRBTFromTests(strings.TrimPrefix(tc.tree, "\n"))
 				}
-				tr.Insert(tc.value)
+				tr.InsertUnique(tc.value)
 
 				if got := formatRBTForTests(tr); got != want {
 					t.Fatalf("insert did not produce the expected tree:\ngot:\n%s\nwant:\n%s", got, want)

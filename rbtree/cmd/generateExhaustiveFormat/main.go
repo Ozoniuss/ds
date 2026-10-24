@@ -63,7 +63,7 @@ func main() {
 
 			tr := rbtree.NewRBT[string]()
 			for _, v := range perm {
-				tr.Insert(v)
+				tr.InsertUnique(v)
 			}
 
 			lines := rbtree.BuildLines(tr.Root(), shape, 2, true, true)
